@@ -3,7 +3,4 @@ Addon for Blender that uses Grease Pencil frames made by the user to make interp
 
 Waiting on Grease Pencil shape keys 😴
 
-https://youtu.be/sTh96dmcoSk
-
-Gumroad
-https://mattthoresen.gumroad.com/l/GP2DMorphs
+[![](https://markdown-videos.vercel.app/youtube/sTh96dmcoSk)](https://youtu.be/sTh96dmcoSk)
