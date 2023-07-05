@@ -1,4 +1,4 @@
-import bpy, math
+import bpy
 
 class GP2DMORPHSPanel:
     bl_space_type = "VIEW_3D"
@@ -89,39 +89,40 @@ class GP2DMORPHS_PT_OptionsGeneratedFrames(bpy.types.Panel):
             if GP2DMORPHSVars.interp_type_left != 'LINEAR' or GP2DMORPHSVars.interp_type_right != 'LINEAR' or GP2DMORPHSVars.interp_type_up != 'LINEAR' or GP2DMORPHSVars.interp_type_down != 'LINEAR':
                 row.operator_menu_enum("GP2DMORPHS.set_all_interp_easings","easing", text="Set All")
             
-            row = col.row()
-            row.label(text="",icon='TRIA_UP')
-            row.prop(GP2DMORPHSVars, "interp_type_up", text="")
-            if GP2DMORPHSVars.interp_type_up == 'CUSTOM':
-                row.label(text=":(",icon='ERROR')
-            elif GP2DMORPHSVars.interp_type_up != 'LINEAR':
-                row.prop(GP2DMORPHSVars, "interp_easing_up", text="")
-
-            if GP2DMORPHSVars.def_frames_h > 2:
+            if GP2DMORPHSVars.gen_frames_h > 1:
                 row = col.row()
-                row.label(text="",icon='TRIA_DOWN')
-                row.prop(GP2DMORPHSVars, "interp_type_down", text="")
-                if GP2DMORPHSVars.interp_type_down == 'CUSTOM':
+                row.label(text="",icon='TRIA_UP')
+                row.prop(GP2DMORPHSVars, "interp_type_up", text="")
+                if GP2DMORPHSVars.interp_type_up == 'CUSTOM':
                     row.label(text=":(",icon='ERROR')
-                elif GP2DMORPHSVars.interp_type_down != 'LINEAR':
-                    row.prop(GP2DMORPHSVars, "interp_easing_down", text="")
+                elif GP2DMORPHSVars.interp_type_up != 'LINEAR':
+                    row.prop(GP2DMORPHSVars, "interp_easing_up", text="")
 
-            if GP2DMORPHSVars.def_frames_w > 2:
+                if GP2DMORPHSVars.def_frames_h > 2:
+                    row = col.row()
+                    row.label(text="",icon='TRIA_DOWN')
+                    row.prop(GP2DMORPHSVars, "interp_type_down", text="")
+                    if GP2DMORPHSVars.interp_type_down == 'CUSTOM':
+                        row.label(text=":(",icon='ERROR')
+                    elif GP2DMORPHSVars.interp_type_down != 'LINEAR':
+                        row.prop(GP2DMORPHSVars, "interp_easing_down", text="")
+            if GP2DMORPHSVars.gen_frames_w > 1:
+                if GP2DMORPHSVars.def_frames_w > 2:
+                    row = col.row()
+                    row.label(text="",icon='TRIA_LEFT')
+                    row.prop(GP2DMORPHSVars, "interp_type_left", text="")
+                    if GP2DMORPHSVars.interp_type_left == 'CUSTOM':
+                        row.label(text=":(",icon='ERROR')
+                    elif GP2DMORPHSVars.interp_type_left != 'LINEAR':
+                        row.prop(GP2DMORPHSVars, "interp_easing_left", text="")
+
                 row = col.row()
-                row.label(text="",icon='TRIA_LEFT')
-                row.prop(GP2DMORPHSVars, "interp_type_left", text="")
-                if GP2DMORPHSVars.interp_type_left == 'CUSTOM':
+                row.label(text="",icon='TRIA_RIGHT')
+                row.prop(GP2DMORPHSVars, "interp_type_right", text="")
+                if GP2DMORPHSVars.interp_type_right == 'CUSTOM':
                     row.label(text=":(",icon='ERROR')
-                elif GP2DMORPHSVars.interp_type_left != 'LINEAR':
-                    row.prop(GP2DMORPHSVars, "interp_easing_left", text="")
-
-            row = col.row()
-            row.label(text="",icon='TRIA_RIGHT')
-            row.prop(GP2DMORPHSVars, "interp_type_right", text="")
-            if GP2DMORPHSVars.interp_type_right == 'CUSTOM':
-                row.label(text=":(",icon='ERROR')
-            elif GP2DMORPHSVars.interp_type_right != 'LINEAR':
-                row.prop(GP2DMORPHSVars, "interp_easing_right", text="")
+                elif GP2DMORPHSVars.interp_type_right != 'LINEAR':
+                    row.prop(GP2DMORPHSVars, "interp_easing_right", text="")
 
         #Stroke order settings
         box = layout.box()
@@ -130,8 +131,11 @@ class GP2DMORPHS_PT_OptionsGeneratedFrames(bpy.types.Panel):
         if GP2DMORPHSVars.stroke_order_changes:
             col.label(text="Order change offset factor")
             row = col.row()
-            row.prop(GP2DMORPHSVars, "stroke_order_change_offset_factor_horizontal", text="Horizontal")
-            row.prop(GP2DMORPHSVars, "stroke_order_change_offset_factor_vertical", text="Vertical")
+            h,v = GP2DMORPHSVars.def_frames_w > 1, GP2DMORPHSVars.def_frames_h > 1
+            if h:
+                row.prop(GP2DMORPHSVars, "stroke_order_change_offset_factor_horizontal", text="Horizontal" if v else "")
+            if v:
+                row.prop(GP2DMORPHSVars, "stroke_order_change_offset_factor_vertical", text="Vertical" if h else "")
 
         #Generation buttons
         box = layout.box()
@@ -150,6 +154,7 @@ class GP2DMORPHS_PT_OptionsControl(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "Grease Pencil"
+    bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
         GP2DMORPHSVars = context.scene.gp2dmorphs_panel_settings

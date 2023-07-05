@@ -1,13 +1,13 @@
 import bpy
-from bpy.props import IntProperty, BoolProperty, FloatProperty
+from bpy.props import IntProperty, BoolProperty
 
 class GP2DMORPHS_Panel_Settings(bpy.types.PropertyGroup):
     def_frame_start: IntProperty(name="def_frame_start", default = 0, description="The starting frame for the user-defined frames")
     def_frames_w: IntProperty(name="def_frames_w", default = 3, description="The width of the '2D array' of user-defined frames",min=1)
-    def_frames_h: IntProperty(name="def_frames_h", default = 1, description="The height of the '2D array' of user-defined frames",min=1)
-    gen_frame_start: IntProperty(name="gen_frame_start", default = 20, description="The starting frame for the generated frames")
-    gen_frames_w: IntProperty(name="gen_frames_w", default = 15, description="The width of the '2D array' of generated frames",min=1)
-    gen_frames_h: IntProperty(name="gen_frames_h", default = 15, description="The height of the '2D array' of generated frames",min=1)
+    def_frames_h: IntProperty(name="def_frames_h", default = 3, description="The height of the '2D array' of user-defined frames",min=1)
+    gen_frame_start: IntProperty(name="gen_frame_start", default = 100, description="The starting frame for the generated frames")
+    gen_frames_w: IntProperty(name="gen_frames_w", default = 21, description="The width of the '2D array' of generated frames",min=1)
+    gen_frames_h: IntProperty(name="gen_frames_h", default = 21, description="The height of the '2D array' of generated frames",min=1)
     generate_frames: BoolProperty(name="generate_frames", default = True, description="Generate interpolated Frames from user-defined frames")
     generate_control: BoolProperty(name="generate_control", default = True, description="Generate Control Objects")
     generate_driver: BoolProperty(name="generate_driver", default = True, description="Generate Driver from Control to Generated frames")

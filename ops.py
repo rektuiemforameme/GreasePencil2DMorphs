@@ -9,13 +9,14 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
     
     def execute(self, context):
         run_ops_without_view_layer_update(self.run)
+        context.view_layer.update()
         return {'FINISHED'}
 
 
     def run(self):
         context = bpy.context
-        GP2DMORPHSVars = context.scene.gp2dmorphs_panel_settings
         gp_obj = context.view_layer.objects.active
+        GP2DMORPHSVars = context.scene.gp2dmorphs_panel_settings
         
         original_mode = gp_obj.mode             #Grab the current mode so we can switch back after
         original_frame = bpy.context.scene.frame_current
@@ -33,12 +34,11 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
         bpy.context.scene.frame_current = original_frame
 
     def generate_frames(self, context, gp_obj):
+        layer = gp_obj.data.layers.active
         GP2DMORPHSVars = context.scene.gp2dmorphs_panel_settings
-        dw, dh = GP2DMORPHSVars.def_frames_w, GP2DMORPHSVars.def_frames_h
         gw, gh = GP2DMORPHSVars.gen_frames_w, GP2DMORPHSVars.gen_frames_h
-        gp = gp_obj.data
+        dw, dh = min(gw,GP2DMORPHSVars.def_frames_w), min(gh,GP2DMORPHSVars.def_frames_h)
         bpy.ops.object.mode_set(mode='EDIT_GPENCIL', toggle=False)
-        layer = gp.layers.active
         def_frames = [[None for y in range(dh)] for x in range(dw)]
         def_frames_end = def_array_pos_to_def_frame_pos(GP2DMORPHSVars.def_frames_w-1,GP2DMORPHSVars.def_frames_h-1)
         gen_frames_end = gen_array_pos_to_gen_frame_pos(GP2DMORPHSVars.gen_frames_w-1,GP2DMORPHSVars.gen_frames_h-1)
@@ -75,17 +75,17 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
                     new_frame.frame_number = tmp_offset + def_frame_pos_offset_to_gen_frame_pos_offset(dy,False)
                     if frames_found and GP2DMORPHSVars.interpolate and new_frame.frame_number > last_frame.frame_number+1:  #If there are frames before this one, and there is space, get to interpolating
                         context.scene.frame_current = new_frame.frame_number-1
-                        #self.interpolate_sequence_disorderly(context, (0,1 if dy == dh-1 else (-1 if dy == 1 else 0)),last_frame,new_frame)
+                        #self.interpolate(context, (0,1 if dy == dh-1 else (-1 if dy == 1 else 0)),last_frame,new_frame)
                         if dy == dh-1:  #Up direction
-                            self.interpolate_sequence_disorderly(context, GP2DMORPHSVars.interp_type_up,GP2DMORPHSVars.interp_easing_up,last_frame,new_frame,direction=(0,1))
+                            self.interpolate(context, GP2DMORPHSVars.interp_type_up,GP2DMORPHSVars.interp_easing_up,direction=(0,1))
                         elif dy == 1:   #Down direction
-                            self.interpolate_sequence_disorderly(context, GP2DMORPHSVars.interp_type_down,
+                            self.interpolate(context, GP2DMORPHSVars.interp_type_down,
                                                                 'EASE_IN' if GP2DMORPHSVars.interp_easing_down == 'EASE_OUT'   #Flip since the down direction is technically going up
                                                                 else ('EASE_OUT' if GP2DMORPHSVars.interp_easing_down == 'EASE_IN'
-                                                                else GP2DMORPHSVars.interp_easing_down),last_frame,new_frame,
+                                                                else GP2DMORPHSVars.interp_easing_down),
                                                                 direction=(0,-1))
                         else:
-                            self.interpolate_sequence_disorderly(context,frame_from=last_frame,frame_to=new_frame,direction=(1,0) if dy > (dh-1)/2 else (-1,0))
+                            self.interpolate(context,direction=(1,0) if dy > (dh-1)/2 else (-1,0))
                     last_frame = new_frame
                     frames_found = True
             
@@ -106,101 +106,36 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
                 vertical_frame_offset = GP2DMORPHSVars.gen_frame_start + gy*(gw+1)
                 for dx in range(dw-1):
                     context.scene.frame_current = vertical_frame_offset + dx*gfpdx + 1
-                    #self.interpolate_sequence_disorderly(context, (1 if dx == dw-1 else (-1 if dx == 1 else 0),0))  #A relic from the past when I wanted clean code
+                    #self.interpolate(context, (1 if dx == dw-1 else (-1 if dx == 1 else 0),0))  #A relic from the past when I wanted clean code
                     if dx == dw-2:  #Right direction
-                        self.interpolate_sequence_disorderly(context, type=GP2DMORPHSVars.interp_type_right,easing=GP2DMORPHSVars.interp_easing_right,direction=(1,0))
+                        self.interpolate(context, type=GP2DMORPHSVars.interp_type_right,easing=GP2DMORPHSVars.interp_easing_right,direction=(1,0))
                     elif dx == 0:   #Left direction
-                        self.interpolate_sequence_disorderly(context, type=GP2DMORPHSVars.interp_type_left,easing= 'EASE_IN' if GP2DMORPHSVars.interp_easing_left == 'EASE_OUT'   #Flip since the left direction is technically going right
+                        self.interpolate(context, type=GP2DMORPHSVars.interp_type_left,easing= 'EASE_IN' if GP2DMORPHSVars.interp_easing_left == 'EASE_OUT'   #Flip since the left direction is technically going right
                                                                                                     else ('EASE_OUT' if GP2DMORPHSVars.interp_easing_left == 'EASE_IN'
                                                                                                     else GP2DMORPHSVars.interp_easing_left),
                                                                                                     direction=(-1,0))
                     else:
-                        self.interpolate_sequence_disorderly(context,direction=(1,0) if dx > (dw-1)/2 else (-1,0))
+                        self.interpolate(context,direction=(1,0) if dx > (dw-1)/2 else (-1,0))
         return
     
-    def interpolate_sequence_disorderly(self, context, type='LINEAR', easing='EASE_OUT', frame_from=None, frame_to=None, direction=(0,0)):
+    def interpolate(self, context, type='LINEAR', easing='EASE_OUT', direction=(1,0)):
         GP2DMORPHSVars = context.scene.gp2dmorphs_panel_settings
         if GP2DMORPHSVars.stroke_order_changes:
             vertical = direction[1] != 0
-            gp = context.view_layer.objects.active.data
-            layer = gp.layers.active
-            if frame_from is None or frame_to is None:      #At least one of the frames is undefined. Find them.
-                for frame in layer.frames:
-                    if frame.frame_number < context.scene.frame_current:
-                        if frame_from is None or frame.frame_number > frame_from.frame_number:
-                            frame_from = frame
-                    else:
-                        if frame_to is None or frame.frame_number < frame_to.frame_number:
-                            frame_to = frame
-                if frame_from is None or frame_to is None:  #Failure. We'll get 'em next time.
-                    print("One of two frames to test order wasn't found :(")
-                    bpy.ops.gpencil.interpolate_sequence(type=type,easing=easing)
-                    return
-
-            orders_different = False
-            order_change = list()
-            for i in range(len(frame_from.strokes.values())):   #Find the differences between the two frames' stroke orders, if any
-                stroke_from = frame_from.strokes.values()[i]
-                to_index = self.get_stroke_index(frame_to.strokes, stroke_from,i)
-                order_change.append(to_index)
-                if to_index != i:       #A difference in stroke order was found. *Sigh* Now we'll have to actually do some work...
-                    orders_different = True
-
-            if orders_different:       
-                #Reoder the To frame to have the same stroke order as the From frame so that interp doesn't fuck up
-                context.scene.frame_set(frame_to.frame_number)
-                self.strokes_order(frame_to.strokes,order_change)
-                context.scene.frame_current = frame_to.frame_number-1
-                #Interpolate
-                bpy.ops.gpencil.interpolate_sequence(type=type,easing=easing)
-                #Now go back and change the To frame and some frames between to have the original To frame stroke order
-                f = GP2DMORPHSVars.stroke_order_change_offset_factor_vertical if vertical else GP2DMORPHSVars.stroke_order_change_offset_factor_horizontal
-                if direction[0] == -1 or direction[1] == -1:    #If the direction is left or down, flip the factor so that the factor is relative to the center of the grid
-                    f = 1-f
-                reorder_num = round((gen_per_def(GP2DMORPHSVars.gen_frames_h,GP2DMORPHSVars.def_frames_h)-1 if vertical else gen_per_def(GP2DMORPHSVars.gen_frames_w,GP2DMORPHSVars.def_frames_w)-1)*f)
-                for fi in range(len(layer.frames)-1,-1,-1): #For each new frame we just made by duplicating defined frames and interpolating
-                    frame = layer.frames[fi]
-                    if frame.frame_number < frame_from.frame_number: #We're done looking for frames to reorder
-                        break
-                    if frame.frame_number > frame_from.frame_number+reorder_num and frame.frame_number <= frame_to.frame_number:    #This is one of the frames we want to reorder
-                        context.scene.frame_set(frame.frame_number)
-                        self.strokes_order(frame.strokes,order_change,undo=True)
-                return
+            #Now go back and change the To frame and some frames between to have the original To frame stroke order
+            f = GP2DMORPHSVars.stroke_order_change_offset_factor_vertical if vertical else GP2DMORPHSVars.stroke_order_change_offset_factor_horizontal
+            if direction[0] == -1 or direction[1] == -1:    #If the direction is left or down, flip the factor so that the factor is relative to the center of the grid
+                f = 1-f
+            bpy.ops.gpencil.interpolate_sequence_disorderly(layers='ACTIVE',type=type,easing=easing,stroke_order_change_offset_factor=f)
+            return
         #No stroke order changes, so just interpolate like normal
         bpy.ops.gpencil.interpolate_sequence(type=type,easing=easing)
         return
-    
-    def get_stroke_index(self, strokes, target, expected_index=0):
-        if self.strokes_equal(strokes.values()[expected_index], target):
-            return expected_index
-        for i in range(expected_index+1,len(strokes.values())):
-            if self.strokes_equal(strokes.values()[i], target):
-                return i
-        for i in range(expected_index-1,-1,-1):
-            if self.strokes_equal(strokes.values()[i], target):
-                return i
-        return -1
-
-    def strokes_equal(self, s1, s2):
-        return s1.time_start == s2.time_start
-    
-    def strokes_order(self, strokes, order_change, undo=False):
-        bpy.ops.gpencil.select_all(action='DESELECT')
-        stroke_order_old = list()
-        for i in range(len(order_change)-1,-1,-1):
-            s = strokes[order_change.index(i) if undo else order_change[i]]
-            stroke_order_old.append(s)
-
-        for s in stroke_order_old:
-            s.select = True
-            bpy.ops.gpencil.stroke_arrange(direction='BOTTOM')
-            s.select = False
 
     def generate_control(self, context, gp_obj):
+        layer = gp_obj.data.layers.active
         GP2DMORPHSVars = context.scene.gp2dmorphs_panel_settings
-        gp = gp_obj.data
         bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-        layer = gp.layers.active
         control_name = (gp_obj.name + layer.info + "Control")
         active_collection = bpy.context.collection
         cursor_location = bpy.context.scene.cursor.location
@@ -219,7 +154,7 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
                 base_mesh.from_pydata([[-0.5,0,0.5],[0.5,0,0.5],[0.5,0,-0.5],[-0.5,0,-0.5],[0,0,-0.5],[0,0,0.5],[-0.5,0,0],[0.5,0,0]], 
                                       [[0,1],[1,2],[2,3],[3,0],[4,5],[6,7]], [])
             base_mesh.update()
-            base_object = bpy.data.objects.new(base_name + 'Base', base_mesh)
+            base_object = bpy.data.objects.new(base_name, base_mesh)
             active_collection.objects.link(base_object)
         #Knob Mesh
         knob_name = (control_name if GP2DMORPHSVars.control_type == 'OBJECT' else "GP2DMorphsShape") + 'Knob'
@@ -260,8 +195,10 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
                 active_collection.objects.link(armatureObj)
             else:
                 armature = armatureObj.data
+            arm_hidden = armatureObj.hide_get()
+            if arm_hidden:
+                armatureObj.hide_set(False)
             context.view_layer.objects.active = armatureObj
-
             bpy.ops.object.mode_set(mode = 'EDIT')
             base_bone_name = control_name+"Base"    #Base
             base_bone = armature.edit_bones.get(base_bone_name)
@@ -280,6 +217,7 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
             if knob_bone is None:
                 knob_bone = armature.edit_bones.new(control_name+"Knob")
                 knob_bone.use_deform = False
+                base_bone = armature.edit_bones.get(base_bone_name)     #For some reason, the base bone reference can get mixed up with other bones during the above pose settings. Re-get.
                 knob_bone.parent = base_bone
                 knob_bone.head = cursor_location
                 knob_bone.tail = [cursor_location.x,cursor_location.y+0.5,cursor_location.z]
@@ -305,13 +243,15 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
             else:
                 knob_bone_pose = armatureObj.pose.bones.get(knob_bone_name)
 
+            bpy.ops.object.mode_set(mode = 'OBJECT')
+            if arm_hidden:
+                armatureObj.hide_set(True)
             return knob_bone_pose
         return knob_object
 
     def generate_driver(self, context, gp_obj, ctrl_obj):
+        layer = gp_obj.data.layers.active
         GP2DMORPHSVars = context.scene.gp2dmorphs_panel_settings
-        gp = gp_obj.data
-        layer = gp.layers.active
         #GP Time Offset Modifier
         mod_name = gp_obj.name + layer.info + "TO"
         mod = gp_obj.grease_pencil_modifiers.get(mod_name)
@@ -346,6 +286,171 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
         
         driver.expression =  str(GP2DMORPHSVars.gen_frame_start) + "+round((posX+.5)*" + str(GP2DMORPHSVars.gen_frames_w-1) + ")+round((posY+.5)*" + str(GP2DMORPHSVars.gen_frames_h-1) + ")*" + str(GP2DMORPHSVars.gen_frames_w+1)
 
+class GP2DMORPHS_OT_interpolate_sequence_disorderly(bpy.types.Operator):
+    bl_idname = "gpencil.interpolate_sequence_disorderly"    
+    bl_label = "Interpolate Sequence Disorderly"
+    bl_description = "Interpolates between two Grease Pencil Frames like Interpolate Sequence, but can handle different stroke orders"
+    bl_options = {'REGISTER', 'UNDO'}
+    step : bpy.props.IntProperty(name="Step",description="Number of frames between generated interpolated frames",default=1,min=1,max=1048573)
+    layers : bpy.props.EnumProperty(name="Layer", 
+                                  items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['layers'].enum_items], 
+                                  description="Layers included in the interpolation",default='ACTIVE')
+    interpolate_selected_only : bpy.props.BoolProperty(name="Only Selected", description="Interpolate only selected strokes",default=False)
+    exclude_breakdowns : bpy.props.BoolProperty(name="Exclude Breakdowns", description="Exclude existing Breakdowns keyframes as interpolation extremes",default=False)
+    flip : bpy.props.EnumProperty(name="Flip Mode", 
+                                  items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['flip'].enum_items], 
+                                  description="Invert destination stroke to match start and end with source stroke", default='AUTO')
+    smooth_steps : bpy.props.IntProperty(name="Iterations",description="Number of times to smooth newly created strokes",default=1,min=1,max=3)
+    smooth_factor : bpy.props.FloatProperty(name="Smooth",description="Amount of smoothing to apply to interpolated strokes, to reduce jitter/noise",default=0.0,min=0.0,max=2.0)
+    type : bpy.props.EnumProperty(name="Interpolation Type", 
+                                  items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['type'].enum_items if ot.identifier != 'CUSTOM'], 
+                                  description="Interpolation Type in the left direction")
+    easing : bpy.props.EnumProperty(name="Interpolation Easing", default='EASE_OUT', 
+                                    items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['easing'].enum_items], 
+                                    description="Interpolation Easing in the left direction")
+    back : bpy.props.FloatProperty(name="Back",description="Amount of overshoot for ‘back’ easing",default=1.702,min=0.0)
+    amplitude : bpy.props.FloatProperty(name="Amplitude",description="Amount to boost elastic bounces for ‘elastic’ easing",default=0.15,min=0.0)
+    period : bpy.props.FloatProperty(name="Period",description="Time between bounces for elastic easing",default=0.15)
+    stroke_order_change_offset_factor : bpy.props.FloatProperty(name="Stroke Order Change Offset Factor", default=0.5, 
+                                                                        description="Factor for the distance between two frames that new interpolated stroke orders should change",
+                                                                        min=0.0,max=1.0)
+    
+    
+    def execute(self, context):
+        context = bpy.context
+        gp = context.view_layer.objects.active.data
+        original_frame = context.scene.frame_current
+        for layer in ([gp.layers.active] if self.layers == 'ACTIVE' else gp.layers):
+            if layer.lock:
+                continue
+            frame_from, frame_to = None, None
+            for frame in layer.frames:
+                if frame.frame_number < context.scene.frame_current:
+                    if frame_from is None or frame.frame_number > frame_from.frame_number:
+                        frame_from = frame
+                else:
+                    if frame_to is None or frame.frame_number < frame_to.frame_number:
+                        frame_to = frame
+            if frame_from is None or frame_to is None:  #Failure. We'll get 'em next time.
+                self.report({'ERROR'}, "Cannot find valid keyframes to interpolate (Breakdowns keyframes are not allowed)")
+                return {'CANCELLED'}
+            elif len(frame_from.strokes) == 0 or len(frame_to.strokes) == 0 or frame_to.frame_number-frame_from.frame_number < 2:
+                continue
+            orders_different = False
+            order_change = list()
+            for i in range(len(frame_from.strokes.values())):   #Find the differences between the two frames' stroke orders, if any
+                stroke_from = frame_from.strokes.values()[i]
+                to_index = self.get_stroke_index(frame_to.strokes, stroke_from,i)
+                order_change.append(to_index)
+                if to_index != i:       #A difference in stroke order was found. *Sigh* Now we'll have to actually do some work...
+                    orders_different = True
+
+            if orders_different:       
+                #Reoder the To frame to have the same stroke order as the From frame so that interp doesn't fuck up
+                context.scene.frame_set(frame_to.frame_number)
+                self.strokes_order(frame_to.strokes,order_change)
+                context.scene.frame_current = frame_to.frame_number-1
+                #Interpolate
+                bpy.ops.gpencil.interpolate_sequence(step=self.step,layers=self.layers,interpolate_selected_only=self.interpolate_selected_only,
+                                             exclude_breakdowns=self.exclude_breakdowns,flip=self.flip,smooth_steps=self.smooth_steps,smooth_factor=self.smooth_factor,
+                                             type=self.type,easing=self.easing,back=self.back,amplitude=self.amplitude,period=self.period)
+                #Now go back and change the To frame and some frames between to have the original To frame stroke order
+                reorder_num = round((frame_to.frame_number-frame_from.frame_number-1)*self.stroke_order_change_offset_factor)
+                for fi in range(len(layer.frames)-1,-1,-1): #For each new frame we just made by duplicating defined frames and interpolating
+                    frame = layer.frames[fi]
+                    if frame.frame_number < frame_from.frame_number: #We're done looking for frames to reorder
+                        break
+                    if frame.frame_number > frame_from.frame_number+reorder_num and frame.frame_number <= frame_to.frame_number:    #This is one of the frames we want to reorder
+                        context.scene.frame_set(frame.frame_number)
+                        self.strokes_order(frame.strokes,order_change,undo=True)
+            else:
+                #No stroke order changes, so just interpolate like normal
+                bpy.ops.gpencil.interpolate_sequence(step=self.step,layers=self.layers,interpolate_selected_only=self.interpolate_selected_only,
+                                                exclude_breakdowns=self.exclude_breakdowns,flip=self.flip,smooth_steps=self.smooth_steps,smooth_factor=self.smooth_factor,
+                                                type=self.type,easing=self.easing,back=self.back,amplitude=self.amplitude,period=self.period)
+            context.scene.frame_current = original_frame
+        return {'FINISHED'}
+    
+    def draw(self, context):
+        layout = self.layout
+        split = layout.split(factor=0.4)
+        col1 = split.column(align=True)
+        col1.alignment='RIGHT' 
+        col2 = split.column(align=True)
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+        col1.label(text="Step")
+        col2.prop(self, "step",text="")
+        col1.label(text="Layer")
+        col2.prop(self, "layers",text="")
+        col1.separator_spacer()
+        col2.prop(self, "interpolate_selected_only")
+        col1.separator_spacer()
+        col2.prop(self, "exclude_breakdowns")
+        col1.label(text="Flip Mode")
+        col2.prop(self, "flip",text="")
+        col1.label(text="Smooth")
+        col2.prop(self, "smooth_factor",text="")
+        col1.label(text="Iterations")
+        col2.prop(self, "smooth_steps",text="")
+        col1.label(text="Type")
+        col2.prop(self, "type",text="")
+        if self.type != 'LINEAR':
+            col1.label(text="Easing")
+            col2.prop(self, "easing",text="")
+        if self.type == 'BACK':
+            col1.label(text="Back")
+            col2.prop(self, "back",text="")
+        elif self.type == 'ELASTIC':
+            col1.label(text="Amplitude")
+            col2.prop(self, "amplitude",text="")
+            col1.label(text="Period")
+            col2.prop(self, "period",text="")
+        col1.label(text="Change Offset")
+        col2.prop(self, "stroke_order_change_offset_factor",text="")
+    
+    def get_stroke_index(self, strokes, target, expected_index=0):
+        if self.strokes_equal(strokes.values()[expected_index], target):
+            return expected_index
+        for i in range(expected_index+1,len(strokes.values())):
+            if self.strokes_equal(strokes.values()[i], target):
+                return i
+        for i in range(expected_index-1,-1,-1):
+            if self.strokes_equal(strokes.values()[i], target):
+                return i
+        return expected_index
+
+    def strokes_equal(self, s1, s2):
+        if s1.time_start == s2.time_start:
+            if s1.time_start == 0:      #If both time_starts are 0, try other methods to compare them because time_start is invalid.
+                if len(s1.points) != len(s2.points):
+                    return False
+                if s1.material_index != s2.material_index:
+                    return False
+                return (s1.vertex_color_fill[0] == s2.vertex_color_fill[0] and
+                        s1.vertex_color_fill[1] == s2.vertex_color_fill[1] and
+                        s1.vertex_color_fill[2] == s2.vertex_color_fill[2] and
+                        s1.vertex_color_fill[3] == s2.vertex_color_fill[3]) #Final check. If the v-color is the same, then either it's the same stroke or there's no way for us to know for sure.
+            else:
+                return True
+        return False
+    
+    def strokes_order(self, strokes, order_change, undo=False):
+        bpy.ops.gpencil.select_all(action='DESELECT')
+        stroke_order_old = list()
+        for i in range(len(order_change)-1,-1,-1):
+            stroke_order_old.append(strokes[order_change.index(i) if undo else order_change[i]])
+
+        for s in stroke_order_old:
+            s.select = True
+            bpy.ops.gpencil.stroke_arrange(direction='BOTTOM')
+            s.select = False
+    
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return ob and ob.type == 'GPENCIL' and (ob.mode == 'EDIT_GPENCIL' or ob.mode == 'PAINT_GPENCIL') 
+
 class GP2DMORPHS_OT_set_frame_by_defined_pos(bpy.types.Operator):
     bl_idname = "gp2dmorphs.set_frame_by_defined_pos"    
     bl_label = "Set Frame by Defined Position"
@@ -376,14 +481,11 @@ class GP2DMORPHS_OT_fill_defined_frames(bpy.types.Operator):
         default=0
     )
     def execute(self, context):
+        layer = context.view_layer.objects.active.data.layers.active
         GP2DMORPHSVars = context.scene.gp2dmorphs_panel_settings
         dw, dh = GP2DMORPHSVars.def_frames_w, GP2DMORPHSVars.def_frames_h
-        gw, gh = GP2DMORPHSVars.gen_frames_w, GP2DMORPHSVars.gen_frames_h
         src_frame = None
-        gp = context.view_layer.objects.active.data
-        layer = gp.layers.active
-        def_frames = [[None for x in range(dw)] for y in range(dh)]
-        #bpy.ops.object.mode_set(mode='EDIT_GPENCIL', toggle=False)
+        def_frames = [[None for y in range(dh)] for x in range(dw)]
                 
         for frame in layer.frames:
             n = frame.frame_number
@@ -500,19 +602,27 @@ def run_ops_without_view_layer_update(func):
 
     finally:
         _BPyOpsSubModOp._view_layer_update = view_layer_update
-        
+
+def gpencil_menu_additions(self, context):
+    self.layout.operator(GP2DMORPHS_OT_interpolate_sequence_disorderly.bl_idname)
+
 _classes = [
     GP2DMORPHS_OT_generate_2d_morphs,
+    GP2DMORPHS_OT_interpolate_sequence_disorderly,
     GP2DMORPHS_OT_set_frame_by_defined_pos,
     GP2DMORPHS_OT_fill_defined_frames,
     GP2DMORPHS_OT_set_all_interp_types,
-    GP2DMORPHS_OT_set_all_interp_easings
+    GP2DMORPHS_OT_set_all_interp_easings,
 ]
     
 def register():
     for cls in _classes:
         bpy.utils.register_class(cls)
+    bpy.types.VIEW3D_MT_edit_gpencil.append(gpencil_menu_additions)
+    bpy.types.VIEW3D_MT_draw_gpencil.append(gpencil_menu_additions)
 
 def unregister():
+    bpy.types.VIEW3D_MT_edit_gpencil.remove(gpencil_menu_additions)
+    bpy.types.VIEW3D_MT_draw_gpencil.remove(gpencil_menu_additions)
     for cls in _classes:
         bpy.utils.unregister_class(cls)
