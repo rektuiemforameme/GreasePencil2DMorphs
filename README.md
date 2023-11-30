@@ -11,4 +11,7 @@ Waiting on Grease Pencil shape keys 😴
 The addon also comes with a custom Grease Pencil operator "Interpolate Sequence Disorderly" that does the same thing as Interpolate Sequence, but can handle interpolating between two frames that have different stroke orders. See the initial release video for limitations.
 
 ## Credits
-Thanks to atticus-lv for [their node editor template](https://github.com/atticus-lv/simple_node_tree). It would have taken me a lot longer to implement my own node editor if I had to figure it all out myself.
+Thanks to atticus-lv for [their node editor template](https://github.com/atticus-lv/simple_node_tree). It would have taken me a bit longer to implement my own node editor if I had to figure it all out myself.
+
+## Gumroad
+If you prefer gumroad for some reason, or want to buy me a beer, you can find the addon [there as well](https://mattthoresen.gumroad.com/l/GP2DMorphs)
