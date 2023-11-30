@@ -6,8 +6,8 @@ from itertools import groupby
 bl_info = {
     "name": "Grease Pencil 2D Morphs",
     "author": "Matt Thompson",
-    "version": (1, 1),
-    "blender": (3, 6, 4),
+    "version": (1, 2),
+    "blender": (4, 0, 1),
     "location": "View3D > N sidebar",
     "description": "Generates 2D 'Morph' frames from user defined frames and manipulate them with controls and drivers. Includes a node editor to define morph-control relationships",
     "warning": "",

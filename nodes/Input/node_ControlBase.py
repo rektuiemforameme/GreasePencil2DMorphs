@@ -51,9 +51,10 @@ class GP2DMorphsNodeControlBase(GP2DMorphsNodeBase):
     def draw_buttons(self, context, layout):
         op_props = layout.operator("gp2dmorphs.add_transform_output",text='',icon='ADD')
         op_props.node_name = self.name
-        layout.prop(self, "obj", text="", icon='ARMATURE_DATA')
+        col = layout.column(align=True)
+        col.prop(self, "obj", text="", icon='ARMATURE_DATA')
         if self.obj is not None:
-            layout.prop_search(self, "bone_name", self.obj.data, "bones", text="")
+            col.prop_search(self, "bone_name", self.obj.data, "bones", text="")
 
     def draw_buttons_ext(self, context, layout):
         row = layout.row(align=True)

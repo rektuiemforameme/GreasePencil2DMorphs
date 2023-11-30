@@ -261,12 +261,26 @@ class GP2DMORPHS_PT_OptionsControl(GP2DMORPHS_PT_OptionsSub):
     @classmethod
     def poll(cls, context):
         return GP2DMORPHS_PT_OptionsSub.active_node is None
+    
+class GP2DMORPHS_PT_NodeTreeMorphMenu(bpy.types.Menu):
+    bl_label = "Morph"
+    bl_idname = "NODEGP2DMORPHS_MT_morph"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("gp2dmorphs.create_controls_for_morphs", text="Create Location Control(s) for morph(s)", icon='ORIENTATION_VIEW').control_type = 'LOC'
+        layout.operator("gp2dmorphs.create_controls_for_morphs", text="Create Rotation Control(s) for morph(s)", icon='DRIVER_ROTATIONAL_DIFFERENCE').control_type = 'ROT'
+        layout.operator("gp2dmorphs.convert_defined_range")
+
+    @classmethod
+    def poll(cls, context):
+        return context.area.ui_type == 'GP2DMorphsNodeTree' and context.space_data.node_tree
 
 @persistent
-def draw_node_editor_header(self, context):
+def draw_node_editor_header_append(self, context):
     if context.area.ui_type == 'GP2DMorphsNodeTree' and context.space_data.node_tree:
-        GP2DMORPHSEditorProps = context.space_data.edit_tree.gp2dmorphs_editor_props
         layout = self.layout
+        GP2DMORPHSEditorProps = context.space_data.edit_tree.gp2dmorphs_editor_props
         layout.separator(factor=0.5)
         row = layout.row(align=True)
         row.operator("gp2dmorphs.update_nodes", text = "Update Nodes", icon='FILE_REFRESH')
@@ -286,11 +300,16 @@ def draw_node_editor_header(self, context):
 def draw_node_editor_node_menu(self, context):
     if context.area.ui_type == 'GP2DMorphsNodeTree' and context.space_data.node_tree:
         layout = self.layout
-        layout.operator("gp2dmorphs.create_controls_for_morphs", text="Create Location Control(s) for morph(s)", icon='ORIENTATION_VIEW').control_type = 'LOC'
-        layout.operator("gp2dmorphs.create_controls_for_morphs", text="Create Rotation Control(s) for morph(s)", icon='DRIVER_ROTATIONAL_DIFFERENCE').control_type = 'ROT'
-        layout.operator("gp2dmorphs.convert_defined_range")
-        layout.operator("gp2dmorphs.remove_and_clean_up_nodes")
+        layout.menu("NODEGP2DMORPHS_MT_morph")
+        layout.operator("gp2dmorphs.flip_node_names", icon='MOD_MIRROR')
+        layout.operator("gp2dmorphs.remove_and_clean_up_nodes", icon='PANEL_CLOSE')
         layout.separator()
+
+@persistent
+def draw_pose_append(self, context):
+    layout = self.layout
+    layout.separator()
+    layout.operator("gp2dmorphs.remove_morph_properties", icon='PANEL_CLOSE')
 
 _classes = [
     NODE_UL_string_search,
@@ -300,17 +319,19 @@ _classes = [
     GP2DMORPHS_PT_OptionsGeneratedFrames,
     GP2DMORPHS_PT_OptionsGeneratedBoneDrivers,
     GP2DMORPHS_PT_OptionsControl,
-    
+    GP2DMORPHS_PT_NodeTreeMorphMenu,
 ]
     
 def register():
     for cls in _classes:
         bpy.utils.register_class(cls)
-    bpy.types.NODE_HT_header.append(draw_node_editor_header)
-    bpy.types.NODE_MT_node.prepend(draw_node_editor_node_menu)
+    bpy.types.NODE_HT_header.append(draw_node_editor_header_append)
+    bpy.types.NODE_MT_node.append(draw_node_editor_node_menu)
+    bpy.types.VIEW3D_MT_pose.append(draw_pose_append)
 
 def unregister():
     for cls in _classes:
         bpy.utils.unregister_class(cls)
-    bpy.types.NODE_HT_header.remove(draw_node_editor_header)  
-    bpy.types.NODE_MT_node.remove(draw_node_editor_node_menu)               
+    bpy.types.NODE_HT_header.remove(draw_node_editor_header_append)  
+    bpy.types.NODE_MT_node.remove(draw_node_editor_node_menu)
+    bpy.types.VIEW3D_MT_pose.remove(draw_pose_append)          

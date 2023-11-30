@@ -7,5 +7,8 @@ Waiting on Grease Pencil shape keys 😴
 ### Update 1.1 Video
 [![](https://markdown-videos.vercel.app/youtube/NDgR_nXWbL0)](https://youtu.be/NDgR_nXWbL0)
 
-### Interpolate Sequence Disorderly
-The addon also comes with a custom Grease Pencil operator "Interpolate Sequence Disorderly" that does the same thing as Interpolate Sequence, but can handle interpolating between two frames whose stroke orders are different. See the introduction video for limitations.
+### Interpolate Sequence Disorderly operator
+The addon also comes with a custom Grease Pencil operator "Interpolate Sequence Disorderly" that does the same thing as Interpolate Sequence, but can handle interpolating between two frames that have different stroke orders. See the initial release video for limitations.
+
+## Credits
+Thanks to atticus-lv for [their node editor template](https://github.com/atticus-lv/simple_node_tree). It would have taken me a lot longer to implement my own node editor if I had to figure it all out myself.

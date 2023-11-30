@@ -114,6 +114,33 @@ class GP2DMORPHS_OT_create_controls_for_morphs(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         return get_main_morph_node(context) is not None
+    
+class GP2DMORPHS_OT_flip_node_names(bpy.types.Operator):
+    bl_idname = "gp2dmorphs.flip_node_names"    
+    bl_label = "Flip Names"
+    bl_description = "Flips the axis suffixes of the names and names of list items of selected nodes"
+    bl_options = {'UNDO'}
+    
+    def execute(self, context):
+        run_ops_without_view_layer_update(self.run,context)
+        context.view_layer.update()
+        return {'FINISHED'}
+
+
+    def run(self,context):
+        node_tree = context.space_data.edit_tree
+        if node_tree is None:
+            self.report({'ERROR'}, "No Node Tree Found")
+            return
+        for node in context.selected_nodes:
+            try:
+                node.flip_names()
+            except:
+                pass
+
+    @classmethod
+    def poll(cls, context):
+        return get_main_morph_node(context) is not None
 
 class GP2DMORPHS_OT_set_node_tree_lod(bpy.types.Operator):
     bl_idname = "gp2dmorphs.set_node_tree_lod"    
@@ -198,8 +225,10 @@ class GP2DMORPHS_OT_set_ctrl_skt_range(bpy.types.Operator):
                             angle, *axis = bone.rotation_axis_angle
                             val = math.degrees(Matrix.Rotation(angle, 4, axis).to_euler()[comp_index])
                         else:
-                            val = math.degrees(bone.rotation_quaternion.to_euler()[comp_index] if bone.rotation_mode=='QUATERNION' else
-                                                bone.rotation_euler[comp_index])
+                            val = math.degrees(bone.matrix.to_quaternion()[comp_index] if bone.rotation_mode=='QUATERNION' else
+                                                bone.matrix.to_euler()[comp_index])
+                            # val = math.degrees(bone.rotation_quaternion.to_euler()[comp_index] if bone.rotation_mode=='QUATERNION' else
+                            #                     bone.rotation_euler[comp_index])
                         if self.index == 0:
                             skt.range_start = val
                         else:
@@ -373,6 +402,7 @@ _classes = [
     GP2DMORPHS_OT_update_nodes,
     GP2DMORPHS_OT_remove_and_clean_up_nodes,
     GP2DMORPHS_OT_create_controls_for_morphs,
+    GP2DMORPHS_OT_flip_node_names,
     GP2DMORPHS_OT_set_ctrl_skt_range,
     GP2DMORPHS_OT_switch_ctrl_skt_range_values,
     GP2DMORPHS_OT_add_transform_output,

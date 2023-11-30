@@ -1,8 +1,9 @@
 import bpy
 import math
-from bpy.props import PointerProperty
+from bpy.props import PointerProperty, BoolProperty
 from ..Output.node_MorphBase import GP2DMorphsNodeMorphBase
 from ...operators.ops import generate_2d_bone_morphs_with_pg, create_driver_variable_expression
+from ...utils import get_flipped_name
 
 class GP2DMorphsNodeBone2DMorph(GP2DMorphsNodeMorphBase):
     bl_idname = "GP2DMorphsNodeBoneMorph"
@@ -10,16 +11,16 @@ class GP2DMorphsNodeBone2DMorph(GP2DMorphsNodeMorphBase):
     bl_icon = 'CON_SPLINEIK'
 
     obj : PointerProperty(name="Armature", type=bpy.types.Object, poll=lambda self, obj: obj.type == 'ARMATURE', description="The armature to add or find bones to morph in")
-
+    lock_morph : BoolProperty(name="Lock Morph",default=False,description="Lock Morph so that its transform data won't get updated when other nodes get updated")
+    
     def init(self, context):
         context = bpy.context
-        node_tree = context.space_data.edit_tree
+        node_tree = self.get_tree(context)
         col_purple=(0.9,0.2,1)
         col_aqua=(0.4,1,1)
         self.create_input('GP2DMorphsNodeLinkedPropSocket', 'def_frames_w', 'Defined Frames Width',socket_color=col_purple,default_value=3)
         self.create_input('GP2DMorphsNodeLinkedPropSocket', 'def_frames_h', 'Defined Frames Height',socket_color=col_aqua,default_value=3)
 
-        node_tree = context.space_data.edit_tree
         for node in node_tree.nodes:
             if node.bl_idname == 'GP2DMorphsNodeBoneMorph' and node.obj is not None:
                 self.obj = node.obj
@@ -51,9 +52,9 @@ class GP2DMorphsNodeBone2DMorph(GP2DMorphsNodeMorphBase):
 
     def generate(self, context):
         self.update_props()
-        if self.obj is None or len(self.name_list) == 0:
+        if self.lock_morph or self.obj is None or len(self.name_list) == 0:
             return
-        node_tree = context.space_data.edit_tree
+        node_tree = self.get_tree(context)
         editor_props = node_tree.gp2dmorphs_editor_props
         name_list_names = [list_item.name for list_item in self.name_list]  #I make good variable names, I swear
         original_selected_state = list()
@@ -206,6 +207,13 @@ class GP2DMorphsNodeBone2DMorph(GP2DMorphsNodeMorphBase):
                     if l.name not in other_bones:
                         self.name_list[len(self.name_list)-1].name = l.name
                         break
+
+    def flip_names(self):
+        if super().flip_names() and self.obj:
+            for n in self.name_list:
+                new_name = get_flipped_name(n.name)
+                if new_name is not False and new_name in self.obj.pose.bones:
+                    n.name = new_name
 
 def register():
     bpy.utils.register_class(GP2DMorphsNodeBone2DMorph)
