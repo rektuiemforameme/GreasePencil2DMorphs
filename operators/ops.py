@@ -458,9 +458,11 @@ class GP2DMORPHS_OT_generate_2d_bone_morphs(bpy.types.Operator):
         else:               #Properties haven't been set. Use the panel settings.
             self.morph_armature_obj = context.view_layer.objects.active
             self.set_props(original_active_obj.gp2dmorphs_panel_settings)
-        if self.morph_armature_obj is None: return
+        if self.morph_armature_obj is None or (not self.generate_location and not self.generate_rotation and not self.generate_scale): return
         dw, dh = self.def_frames_w, self.def_frames_h
-
+        orientation = 'H' if dh == 1 else 'V' if dw == 1 else '2'   #Morph is Horizontal, Vertical, or 2 dimensional
+        def_length = max(dw,dh)
+        multi_interp = def_length > 2
         ctrl_objs = list((None, None))
         if self.generate_control:
             trans_limits = {'L':None,'R':None,'S':None}    #Components of Loc,Rot,Scale that are needed.
@@ -488,74 +490,146 @@ class GP2DMORPHS_OT_generate_2d_bone_morphs(bpy.types.Operator):
                                            self.morph_armature_obj.name + "Control" if (self.control_type=='OBJECT' or self.control_bone_name_y=='' ) else self.control_bone_name_y,
                                            self.control_armature_name_y)
         
-        driver_var_x = create_driver_variable_expression("varX",self.control_bone_transform_type_x[:3],
-                                                              math.radians(self.control_range_start_x),math.radians(self.control_range_end_x),self.control_range_flip_x)
-        driver_var_y = create_driver_variable_expression("varY",self.control_bone_transform_type_y[:3],
-                                                              math.radians(self.control_range_start_y),math.radians(self.control_range_end_y),self.control_range_flip_y)
-
+        #Create driver expression prefix and suffix
+        driver_expr_head = ("biinterp" if orientation == '2' else "interp") + ("_multi(" if multi_interp else "(")
+        driver_expr_tail = ((("," + create_driver_variable_expression('varX',self.control_bone_transform_type_x[:3],
+                                                                    math.radians(self.control_range_start_x),math.radians(self.control_range_end_x),self.control_range_flip_x)) if dw > 1 else "")
+                        +   (("," + create_driver_variable_expression('varY',self.control_bone_transform_type_y[:3],
+                                                                    math.radians(self.control_range_start_y),math.radians(self.control_range_end_y),self.control_range_flip_y)) if dh > 1 else "")
+                        +   ")")
+        
         if original_active_obj is not self.morph_armature_obj:
             self.morph_armature_obj.select_set(True)
             context.view_layer.objects.active = self.morph_armature_obj
         if original_mode != 'POSE':
             bpy.ops.object.mode_set(mode='POSE', toggle=False)
         bpy.ops.gp2dmorphs.remove_morph_drivers()
-        
-        for bone in context.selected_pose_bones:
-            bone_locs = [[[0.0 for y in range(dh)] for x in range(dw)] for component in range(3)]
-            bone_locs_needed = [False for component in range(3)]
-            rot_comps = 4 if bone.rotation_mode=='QUATERNION' or bone.rotation_mode=='AXIS_ANGLE' else 3
-            bone_rots = [[[0.0 for y in range(dh)] for x in range(dw)] for component in range(rot_comps)]
-            bone_rots_needed = [False for component in range(rot_comps)]
-            bone_scales = [[[0.0 for y in range(dh)] for x in range(dw)] for component in range(3)]
-            bone_scales_needed = [False for component in range(3)]
+        bones = context.selected_pose_bones
+        bones_len = len(bones)
+        #Transform arrays are in the format [Bone Index][morph x][morph y] or [Bone Index][morph alpha]
+        if self.generate_location:
+            bone_locs = [[[[0.0 for y in range(dh)] for x in range(dw)] for component in range(3)] if orientation == '2' else [[0.0 for i in range(def_length)] for component in range(3)] for bone_index in range(bones_len)]
+            bone_locs_needed = [[False for component in range(3)] for bone_index in range(bones_len)]
+        if self.generate_rotation:
+            bone_rots = [[[[0.0 for y in range(dh)] for x in range(dw)] for component in range(4 if bone.rotation_mode=='QUATERNION' or bone.rotation_mode=='AXIS_ANGLE' else 3)] if orientation == '2' else 
+                         [[0.0 for i in range(def_length)] for component in range(4 if bone.rotation_mode=='QUATERNION' or bone.rotation_mode=='AXIS_ANGLE' else 3)] 
+                         for bone in bones]
+            bone_rots_needed = [[False for component in range(len(bone_rots[bone_index]))] for bone_index in range(bones_len)]
+        if self.generate_scale:
+            bone_scales = [[[[0.0 for y in range(dh)] for x in range(dw)] for component in range(3)] if orientation == '2' else [[0.0 for i in range(def_length)] for component in range(3)] for bone_index in range(bones_len)]
+            bone_scales_needed = [[False for component in range(3)] for bone_index in range(bones_len)]
 
-            for dx in range(dw):
+        match orientation:  #Get the bone's transform values for the morph from the defined frames
+            case '2':   #2 Dimensional
+                for dx in range(dw):
+                    for dy in range(dh):
+                        context.scene.frame_set(def_array_pos_to_def_frame_pos(dx,dy,self.def_frame_start,dw))
+                        for i,bone in enumerate(bones):
+                            if self.generate_location:
+                                self.set_comps_and_needed_2D(bone_locs[i],dx,dy,bone.location,bone_locs_needed[i])
+                            if self.generate_rotation:
+                                self.set_comps_and_needed_2D(bone_rots[i],dx,dy,bone.rotation_quaternion if bone.rotation_mode=='QUATERNION' else
+                                                                            bone.rotation_axis_angle if bone.rotation_mode=='AXIS_ANGLE' else
+                                                                            bone.rotation_euler,bone_rots_needed[i])
+                            if self.generate_scale:
+                                self.set_comps_and_needed_2D(bone_scales[i],dx,dy,bone.scale,bone_scales_needed[i])
+            case 'H':   #Horizontal
+                for dx in range(dw):
+                    context.scene.frame_set(self.def_frame_start + dx)
+                    for i,bone in enumerate(bones):
+                        if self.generate_location:
+                            self.set_comps_and_needed_1D(bone_locs[i],dx,bone.location,bone_locs_needed[i])
+                        if self.generate_rotation:
+                            self.set_comps_and_needed_1D(bone_rots[i],dx,bone.rotation_quaternion if bone.rotation_mode=='QUATERNION' else
+                                                                        bone.rotation_axis_angle if bone.rotation_mode=='AXIS_ANGLE' else
+                                                                        bone.rotation_euler,bone_rots_needed[i])
+                        if self.generate_scale:
+                            self.set_comps_and_needed_1D(bone_scales[i],dx,bone.scale,bone_scales_needed[i])
+            case 'V':   #Vertical
                 for dy in range(dh):
-                    context.scene.frame_set(def_array_pos_to_def_frame_pos(dx,dy,self.def_frame_start,dw))
-                    if self.generate_location:
-                        self.set_comps_and_needed(bone_locs,dx,dy,bone.location,bone_locs_needed)
-                    if self.generate_rotation:
-                        self.set_comps_and_needed(bone_rots,dx,dy,bone.rotation_quaternion if bone.rotation_mode=='QUATERNION' else
-                                                                    bone.rotation_axis_angle if bone.rotation_mode=='AXIS_ANGLE' else
-                                                                    bone.rotation_euler,bone_rots_needed)
-                    if self.generate_scale:
-                        self.set_comps_and_needed(bone_scales,dx,dy,bone.scale,bone_scales_needed)
-            
+                    context.scene.frame_set(self.def_frame_start + dy*2)
+                    for i,bone in enumerate(bones):
+                        if self.generate_location:
+                            self.set_comps_and_needed_1D(bone_locs[i],dy,bone.location,bone_locs_needed[i])
+                        if self.generate_rotation:
+                            self.set_comps_and_needed_1D(bone_rots[i],dy,bone.rotation_quaternion if bone.rotation_mode=='QUATERNION' else
+                                                                        bone.rotation_axis_angle if bone.rotation_mode=='AXIS_ANGLE' else
+                                                                        bone.rotation_euler,bone_rots_needed[i])
+                        if self.generate_scale:
+                            self.set_comps_and_needed_1D(bone_scales[i],dy,bone.scale,bone_scales_needed[i])
+        for i,bone in enumerate(bones):
+            bone_path = "pose.bones[\"" + bone.name + "\"]"
             #Location
             if self.generate_location:
                 for comp in range(3):
-                    if bone_locs_needed[comp] == True:
+                    if bone_locs_needed[i][comp] is True:
+                        prop_name = "GP2DMorphsBoneMorphLocs" + str(comp)
                         driver = create_ctrl_driver(context,ctrl_objs[0],ctrl_objs[1],bone,"location",comp,
-                                      control_transform_type_x=self.control_bone_transform_type_x,control_transform_type_y=self.control_bone_transform_type_y,
-                                      control_type=self.control_type,mode=self.mode)
-                        driver.expression = bonemorph_driver_expression(bone_locs[comp],driver_var_x,driver_var_y)
+                                    control_transform_type_x=self.control_bone_transform_type_x,control_transform_type_y=self.control_bone_transform_type_y,
+                                    control_type=self.control_type,mode=self.mode)
+                        if multi_interp or orientation == '2':
+                            expr = driver_expr_head + str(bone_locs[i][comp]) + driver_expr_tail
+                            if len(expr) > 256: #Blender is dumb and only allows driver expressions with 256 characters or less, so we're going to have to use custom properties to hold large arrays instead of baking into the expression
+                                expr = driver_expr_head + "eval(varArray)" + driver_expr_tail
+                                # bone[prop_name] = bone_locs[i][comp]
+                                bone[prop_name] = str(bone_locs[i][comp])
+                                add_driver_custom_props_var(driver, self.morph_armature_obj, var_name='varArray', prop_name=prop_name, prop_path=bone_path)
+                        else:
+                            expr = f"{driver_expr_head}{bone_locs[i][comp][0]},{bone_locs[i][comp][1]}{driver_expr_tail}"
+                        driver.expression = expr
             #Rotation
             if self.generate_rotation:
                 rot_var_name = ("rotation_quaternion" if bone.rotation_mode=='QUATERNION' else
                                 "rotation_axis_angle" if bone.rotation_mode=='AXIS_ANGLE' else
                                 "rotation_euler")
-                for comp in range(rot_comps):
-                    if bone_rots_needed[comp] == True:
+                for comp in range(len(bone_rots_needed[i])):
+                    if bone_rots_needed[i][comp] is True:
+                        prop_name = "GP2DMorphsBoneMorphRots" + str(comp)
                         driver = create_ctrl_driver(context,ctrl_objs[0],ctrl_objs[1],bone,rot_var_name,comp,
-                                      control_transform_type_x=self.control_bone_transform_type_x,control_transform_type_y=self.control_bone_transform_type_y,
-                                      control_type=self.control_type,mode=self.mode)
-                        driver.expression = bonemorph_driver_expression(bone_rots[comp],driver_var_x,driver_var_y)
+                                    control_transform_type_x=self.control_bone_transform_type_x,control_transform_type_y=self.control_bone_transform_type_y,
+                                    control_type=self.control_type,mode=self.mode)
+                        if multi_interp or orientation == '2':
+                            expr = driver_expr_head + str(bone_rots[i][comp]) + driver_expr_tail
+                            if len(expr) > 256: #Blender is dumb and only allows driver expressions with 256 characters or less, so we're going to have to use custom properties to hold large arrays instead of baking into the expression
+                                expr = driver_expr_head + "varArray" + driver_expr_tail
+                                bone[prop_name] = bone_rots[i][comp]
+                                add_driver_custom_props_var(driver, self.morph_armature_obj, var_name='varArray', prop_name=prop_name, prop_path=bone_path)
+                        else:
+                            expr = driver_expr_head + str(bone_rots[i][comp][0])+","+str(bone_rots[i][comp][1]) + driver_expr_tail
+                        driver.expression = expr
             #Scale
             if self.generate_scale:
                 for comp in range(3):
-                    if bone_scales_needed[comp] == True:
+                    if bone_scales_needed[i][comp] is True:
+                        prop_name = "GP2DMorphsBoneMorphScales" + str(comp)
                         driver = create_ctrl_driver(context,ctrl_objs[0],ctrl_objs[1],bone,"scale",comp,
-                                      control_transform_type_x=self.control_bone_transform_type_x,control_transform_type_y=self.control_bone_transform_type_y,
-                                      control_type=self.control_type,mode=self.mode)
-                        driver.expression = bonemorph_driver_expression(bone_scales[comp],driver_var_x,driver_var_y)
+                                    control_transform_type_x=self.control_bone_transform_type_x,control_transform_type_y=self.control_bone_transform_type_y,
+                                    control_type=self.control_type,mode=self.mode)
+                        if multi_interp or orientation == '2':
+                            expr = driver_expr_head + str(bone_scales[i][comp]) + driver_expr_tail
+                            if len(expr) > 256: #Blender is dumb and only allows driver expressions with 256 characters or less, so we're going to have to use custom properties to hold large arrays instead of baking into the expression
+                                expr = driver_expr_head + "varArray" + driver_expr_tail
+                                bone[prop_name] = bone_scales[i][comp]
+                                add_driver_custom_props_var(driver, self.morph_armature_obj, var_name='varArray', prop_name=prop_name, prop_path=bone_path)
+                        else:
+                            expr = f"{driver_expr_head}{bone_scales[i][comp][0]},{bone_scales[i][comp][1]}{driver_expr_tail}"
+                        driver.expression = expr
         
-        context.scene.frame_set(original_frame)
+        context.scene.frame_set(original_frame) #TODO: check frame_current set instead
         context.view_layer.objects.active = original_active_obj
         bpy.ops.object.mode_set(mode=original_mode, toggle=False)
     
-    def set_comps_and_needed(self, comps, dx, dy, values, comps_needed):
-        for comp in range(len(values)):   #For each component of the location vector X, Y, Z 
-            val = values[comp]
+    def set_comps_and_needed_1D(self, comps, i, values, comps_needed):
+        for comp,val in enumerate(values):   #For each component of the location vector X, Y, Z 
+            comps[comp][i] = val
+            needed_val = comps_needed[comp]
+            if needed_val is False:     #Checks if the component ever changes. If it doesn't, we don't need to make a driver for it later.
+                comps_needed[comp] = val
+            elif needed_val is not True and not math.isclose(needed_val, val, abs_tol=0.001):
+                comps_needed[comp] = True
+
+    def set_comps_and_needed_2D(self, comps, dx, dy, values, comps_needed):
+        for comp,val in enumerate(values):   #For each component of the location vector X, Y, Z 
             comps[comp][dx][dy] = val
             needed_val = comps_needed[comp]
             if needed_val is False:     #Checks if the component ever changes. If it doesn't, we don't need to make a driver for it later.
@@ -624,6 +698,21 @@ class GP2DMORPHS_OT_remove_morph_drivers(bpy.types.Operator):
                 #Scale
                 if self.remove_scale:
                     bone.driver_remove("scale")
+
+        return {'FINISHED'}
+    
+class GP2DMORPHS_OT_remove_morph_properties(bpy.types.Operator):
+    bl_idname = "gp2dmorphs.remove_morph_properties"    
+    bl_label = "Remove Morph Properties"
+    bl_description = "Removes GP2DMorphs custom properties from selected bones"
+    
+    def execute(self, context):
+        for bone in context.selected_pose_bones:
+            for i in range(len(bone.keys())-1,-1,-1):
+                k = list(bone.keys())[i]
+                if k.startswith("GP2DMorph"):
+                    print(k)
+                    del bone[k]
 
         return {'FINISHED'}
 
@@ -1051,7 +1140,7 @@ def create_ctrl_driver(context, ctrl_obj_x, ctrl_obj_y, driver_dest, dest_prop_n
         var_y = driver.variables.new()
         var_y.type='TRANSFORMS'
         var_y.name="varY"
-        var_y.targets[0].transform_type = control_transform_type_y   #The variable is for the Y location in the array of frames, which is mapped to the Z location because you usually GPencil sideways instead of top-down
+        var_y.targets[0].transform_type = control_transform_type_y
         var_y.targets[0].transform_space = 'LOCAL_SPACE'
     
     if control_type == 'OBJECT':
@@ -1067,6 +1156,17 @@ def create_ctrl_driver(context, ctrl_obj_x, ctrl_obj_y, driver_dest, dest_prop_n
         var_y.targets[0].id = ctrl_obj_y.id_data
         var_y.targets[0].bone_target = ctrl_obj_y.name
     return driver
+
+def add_driver_custom_props_var(driver, target_id, target_id_type='OBJECT',var_name='varArray', prop_name='GP2DMorphsLocX', prop_path=""):
+    var_prop = driver.variables.get(var_name,None)
+    if var_prop is None:
+        var_prop = driver.variables.new()
+        var_prop.type='SINGLE_PROP'
+        var_prop.name=var_name
+        var_target = var_prop.targets[0]
+        var_target.id_type = target_id_type
+        var_target.id = target_id
+        var_target.data_path = prop_path + f'''["{prop_name}"]'''
 #The same as update_gp_time_offset_modifier, except doesn't check for conflicting modifiers to remove so it's a wee bit faster in some scenarios
 def get_gp_time_offset_modifier(gp_obj,layer_name,mod_name='',pass_index=-2,mode='ANIMATE'):
     if gp_obj is None:  return None
@@ -1125,7 +1225,9 @@ def update_gp_time_offset_modifier(gp_obj,layer_names,mod_name='',pass_index=-2,
                 elif m.layer_pass != 0 and m.layer_pass == main_layer.pass_index:      #This modifier will conflict with ours. Probably a remnant of using different settings. Mark it for removal.
                     mods_to_remove.append(m)
     for i in range(len(mods_to_remove)-1,-1,-1):    #Remove conflicting modifiers
-        gp_obj.grease_pencil_modifiers.remove(mods_to_remove[i])
+        m = mods_to_remove[i]
+        m.driver_remove("offset")
+        gp_obj.grease_pencil_modifiers.remove(m)
     if mod is None:         #If we don't have a modifier yet, make one
         if mod_name == '':
             mod_name = gp_obj.name + main_layer.info + "TO"
@@ -1189,11 +1291,10 @@ def create_driver_variable_expression(var_name="varX",type='LOC',range_start=-ma
         expr += var_name + "/2"
             
     return expr + ")"
-
-def bonemorph_driver_expression(values, driver_var_x="clamp(varX+.5)", driver_var_y="clamp(varY+.5)"):
+# Returns a tuple (Expression, Values were baked)
+def bonemorph_driver_expression(values, driver_var_array="",driver_var_x="clamp(varX+.5)", driver_var_y="clamp(varY+.5)"):
     len_x = len(values)
     len_y = len(values[0])
-    val_num = len_x * len_y
     if len_x == 0 or len_y == 0:
         return "1"
     
@@ -1202,7 +1303,6 @@ def bonemorph_driver_expression(values, driver_var_x="clamp(varX+.5)", driver_va
             expr_opening = "interp_multi("
             val_array = values[0]
             expr_tail = ","+driver_var_y+")"
-            multi_dimensional = False
         else:   #I'm not super worried about lerps between two values going over the 256 char limit, so just return it
             return "lerp("+str(values[0][0])+","+str(values[0][1])+","+driver_var_y+")"             #We only have linear interpolation implemented, so just use lerp.
     elif len_y == 1:   #1 Dimensional Horizontal
@@ -1210,100 +1310,17 @@ def bonemorph_driver_expression(values, driver_var_x="clamp(varX+.5)", driver_va
             expr_opening = "interp_multi("
             val_array = [val[0] for val in values]   #Convert a list of lists of single values into a list of those values
             expr_tail = ","+driver_var_x+")"
-            multi_dimensional = False
         else:
             return "lerp("+str(values[0][0])+","+str(values[1][0])+","+driver_var_x+")"             #We only have linear interpolation implemented, so just use lerp.
     else:
         expr_opening = "biinterp_multi(" if (len_x > 2 or len_y > 2) else "biinterp("
         val_array = values
         expr_tail = ","+driver_var_x+","+driver_var_y+")"
-        multi_dimensional = True
     
-    expr = expr_opening + str(val_array).replace(" ","") + expr_tail
-    original_len = len(expr)
-    if original_len > 256: #Blender is dumb and only allows driver expressions with 256 characters or less, so we're going to have to trim it down
-        trim_count = 0
-        decimals_count = 0  #count of values with multiple decimal points that can be trimmed
-        decimals_total = 0
-        val_trim_status = []
-        if multi_dimensional:
-            w = len(val_array)      #array width
-            h = len(val_array[0])   #array height
-            for x in range(w):
-                val_trim_status.append([])
-                for y in range(h):
-                    v = val_array[x][y]
-                    dec_points = str(v)[::-1].find('.')
-                    dec_trimmable = dec_points > 3
-                    whole_num = v % 1 < 0.000001
-                    zero_start = not whole_num and v < 1 and v > -1
-                    val_trim_status[x].append((dec_trimmable, whole_num, zero_start))
-                    if dec_trimmable:   
-                        decimals_count += 1
-                        decimals_total += dec_points
-                    if whole_num:       trim_count += dec_points+1    #we can trim off the decimal points from the string since it's a whole number
-                    elif zero_start:    trim_count += 1               #we can trim off the zero at the beginning of the decimal number
-            chars_to_remove = original_len - 256 - trim_count
-            trim_decimals = chars_to_remove > 0
-            dec_places = 10 if not trim_decimals else (math.floor(decimals_total/decimals_count - chars_to_remove/decimals_count) - 1)    #figure out how many decimal places each value can have
-            val_expr = "["
-            for x in range(w):
-                val_expr += "["
-                for y in range(h):
-                    v = val_array[x][y]
-                    trim_status = val_trim_status[x][y]
-                    val_str = f"{v:.{dec_places}f}" if trim_status[0] else str(v)
-                    if trim_status[1]:      #It's a whole number, so trim off all decimal points
-                        val_str = val_str[:val_str.find('.')]
-                    elif trim_status[2]:    #We can trim off the zero at the beginning
-                        val_str = ("-" + val_str[2:]) if val_str[0] == '-' else val_str[1:]
-                    val_expr += val_str
-                    if y < h-1:
-                        val_expr += ","
-                val_expr += "]"
-                if x < w-1:
-                    val_expr += ","
-            val_expr += "]"
-        else:
-            w = len(val_array)      #array width
-            for x in range(w):
-                v = val_array[x]
-                dec_points = str(v)[::-1].find('.')
-                dec_trimmable = dec_points > 3
-                whole_num = v % 1 < 0.000001
-                zero_start = not whole_num and v < 1 and v > -1
-                val_trim_status.append((dec_trimmable, whole_num, zero_start))
-                if dec_trimmable:   
-                    decimals_count += 1
-                    decimals_total += dec_points
-                if whole_num:       trim_count += dec_points+1    #we can trim off the decimal points from the string since it's a whole number
-                elif zero_start:    trim_count += 1               #we can trim off the zero at the beginning of the decimal number
-            chars_to_remove = original_len - 256 - trim_count
-            trim_decimals = chars_to_remove > 0
-            dec_places = 10 if not trim_decimals else (math.floor(decimals_total/decimals_count - chars_to_remove/decimals_count) - 1)    #figure out how many decimal places each value can have
-            val_expr = "["
-            for x in range(w):
-                v = val_array[x]
-                trim_status = val_trim_status[x]
-                val_str = f"{v:.{dec_places}f}" if trim_status[0] else str(v)
-                if trim_status[1]:      #It's a whole number, so trim off all decimal points
-                    val_str = val_str[:val_str.find('.')]
-                elif trim_status[2]:    #We can trim off the zero at the beginning
-                    val_str = ("-" + val_str[2:]) if val_str[0] == '-' else val_str[1:]
-                val_expr += val_str
-                if x < w-1:
-                    val_expr += ","
-            val_expr += "]"
-        expr = expr_opening + val_expr + expr_tail
-        # chars_to_remove = original_len - 256
-        # i = 0
-        # while i != -1:  #Change '0.0' to '0' and 0.12323 to .12323
-        #     i = expr.find(".", i + 1)
-        #     if expr[i+1] == '0' and not expr[i+2].isdigit():    #'0.0' to '0'
-        #         expr = expr[0:i] + expr[i+2]
-        #     elif expr[i-1] == '0' and not expr[i-2].isdigit():  #0.12323 to .12323
-        #         expr = expr[0:i] + expr[i+2]
-    return expr
+    expr = expr_opening + str(val_array) + expr_tail
+    if len(expr) > 256: #Blender is dumb and only allows driver expressions with 256 characters or less, so we're going to have to use custom properties to hold large arrays instead of baking into the expression
+        return (expr_opening + driver_var_array + expr_tail, False)
+    return (expr, True)
         
 def update_or_create_limit_constraints(obj,n,trans_comps_used={'L':{'X':(-0.5,0.5),'Y':(-0.5,0.5),'Z':None},'R':None,'S':None}):
     #Location
@@ -1621,15 +1638,24 @@ def generate_morph_frames(self, context):
     op_layers = 'ALL' if multiple_layers else 'ACTIVE'
     if multiple_layers:
         original_layers_status = []
-        for l in gp.layers:
-            original_layers_status.append((l, l.lock, l.hide))
-        gp.use_autolock_layers = False
-        for l in gp.layers:     #I don't like looping through layers twice, but setting autolock will unlock all layers so it has to be done after we record the layer status, but before locking unused layers
-            if l in self.layers:
-                l.lock = False
-                l.hide = False
-            else:
-                l.lock = True
+        if original_autolock:  #Turning off autolock so we can use the layers will unlock all layers so it has to be done after we record the layers' statuses, but before locking unused layers
+            for l in gp.layers:
+                original_layers_status.append((l, l.lock, l.hide))
+            gp.use_autolock_layers = False
+            for l in gp.layers:    
+                if l in self.layers:
+                    l.lock = False
+                    l.hide = False
+                else:
+                    l.lock = True
+        else:                   #No autolock, so we're free to do it all in one loop.
+            for l in gp.layers:
+                original_layers_status.append((l, l.lock, l.hide))
+                if l in self.layers:
+                    l.lock = False
+                    l.hide = False
+                else:
+                    l.lock = True
     else:
         original_layer_locked = self.layers[0].lock
         self.layers[0].lock = False
@@ -1671,12 +1697,15 @@ def generate_morph_frames(self, context):
                         src_frame = frames[dx][dy]
                         if src_frame is None:   #The defined frame is undefined D:
                             if (dx == 0 or dx == dw-1) and (dy == 0 or dy == dh-1):     #If the undefined frame is a corner, we got big problems. Otherwise, we good. Move along.
-                                if multiple_layers: self.reset_gp_layers_status(gp,multiple_layers,original_layers_status=original_layers_status,original_active_layer=original_active_layer,original_autolock=original_autolock)
-                                else:               self.reset_gp_layers_status(gp,multiple_layers,original_layer_locked=original_layer_locked,original_active_layer=original_active_layer,original_autolock=original_autolock)
-                                self.report({'ERROR'}, 'Corner Frame (' + str(dx) + ", " + str(dy) + ") of layer '" + layer.info + "' at frame " + str(def_array_pos_to_def_frame_pos(dx,dy,self.def_frame_start,dw)) + " not defined.")
+                                if multiple_layers: reset_gp_layers_status(gp,multiple_layers,original_layers_status=original_layers_status,original_active_layer=original_active_layer,original_autolock=original_autolock)
+                                else:               reset_gp_layers_status(gp,multiple_layers,original_layer_locked=original_layer_locked,original_active_layer=original_active_layer,original_autolock=original_autolock)
+                                self.report({'ERROR'}, f"Corner Frame ({dx}, {dy}) of layer '{layer.info}' at frame {def_array_pos_to_def_frame_pos(dx,dy,self.def_frame_start,dw)} not defined.")
                                 return
                             continue
                         else:   #Valid defined frame. Duplicate  and interpolate for this section of the vertical if needed.
+                            if len(src_frame.strokes) == 0 and frames_found and new_frame_num > last_frame_num+1 and self.interpolate: #Blank frame. 
+                                for i in range(new_frame_num-1,last_frame_num,-1):  #We're going to have to duplicate the frame manually because interpolation won't work.
+                                    layer.frames.new(i)
                             layer.frames.copy(src_frame).frame_number = new_frame_num
                         
                     if frames_found and new_frame_num > last_frame_num+1 and self.interpolate:  #If there are frames before this one, and there is space, get to interpolating
@@ -1690,7 +1719,7 @@ def generate_morph_frames(self, context):
                                                                 else self.interp_easing_down,
                                                                 direction=(0,-1),layers=op_layers)
                         else:
-                            interpolate_frames(self, context,direction=(1,0) if dy > (dh-1)/2 else (-1,0),layers=op_layers)
+                            interpolate_frames(self, context,direction=(0,1) if dy > (dh-1)/2 else (0,-1),layers=op_layers)
                     last_frame_num = new_frame_num
                     frames_found = True
                     def_used_y += 1
@@ -1740,7 +1769,8 @@ def interpolate_frames(self, context, type='LINEAR', easing='EASE_OUT', directio
             f = self.stroke_order_change_offset_factor_vertical if vertical else self.stroke_order_change_offset_factor_horizontal
             if direction[0] == -1 or direction[1] == -1:    #If the direction is left or down, flip the factor so that the factor is relative to the center of the grid
                 f = 1-f
-            bpy.ops.gpencil.interpolate_sequence_disorderly(layers=layers,type=type,easing=easing,stroke_order_change_offset_factor=f)
+            print(direction)
+            interpolate_sequence_view_independent(context,layers=layers,type=type,easing=easing,stroke_order_changes=True,stroke_order_change_offset_factor=f)
             return
         #No stroke order changes, so just interpolate like normal
         interpolate_sequence_view_independent(context,layers=layers,type=type,easing=easing)
@@ -1758,7 +1788,7 @@ def reset_gp_layers_status(gp,multiple_layers=True,original_layers_status=None,o
     gp.layers.active = original_active_layer
 
 def interpolate_sequence_view_independent(context=None, step=1, layers='ACTIVE', interpolate_selected_only=False, exclude_breakdowns=False, flip='AUTO', 
-                                          smooth_steps=1, smooth_factor=0.0, type='LINEAR', easing='AUTO', back=1.702, amplitude=0.15, period=0.15):
+                                          smooth_steps=1, smooth_factor=0.0, type='LINEAR', easing='AUTO', back=1.702, amplitude=0.15, period=0.15, stroke_order_changes=False,stroke_order_change_offset_factor=0.5):
     #We need to override the context area sometimes because interpolate_sequence can only be run in the 3D viewport.
     if context is None:
         context = bpy.context
@@ -1772,7 +1802,12 @@ def interpolate_sequence_view_independent(context=None, step=1, layers='ACTIVE',
         region=[region for region in areas[0].regions if region.type == 'WINDOW'][0],
         screen=context.window.screen
     ):
-        bpy.ops.gpencil.interpolate_sequence(step=step,layers=layers,interpolate_selected_only=interpolate_selected_only,
+        if stroke_order_changes:
+            bpy.ops.gpencil.interpolate_sequence_disorderly(step=step,layers=layers,interpolate_selected_only=interpolate_selected_only,
+                                                exclude_breakdowns=exclude_breakdowns,flip=flip,smooth_steps=smooth_steps,smooth_factor=smooth_factor,
+                                                type=type,easing=easing,back=back,amplitude=amplitude,period=period,stroke_order_change_offset_factor=stroke_order_change_offset_factor)
+        else:
+            bpy.ops.gpencil.interpolate_sequence(step=step,layers=layers,interpolate_selected_only=interpolate_selected_only,
                                                 exclude_breakdowns=exclude_breakdowns,flip=flip,smooth_steps=smooth_steps,smooth_factor=smooth_factor,
                                                 type=type,easing=easing,back=back,amplitude=amplitude,period=period)
 #Regular lerp. In the future, might have more types, but for now it's just lerp.
@@ -1831,6 +1866,7 @@ _classes = [
     GP2DMORPHS_OT_convert_defined_range,
     GP2DMORPHS_OT_interpolate_sequence_disorderly,
     GP2DMORPHS_OT_remove_morph_drivers,
+    GP2DMORPHS_OT_remove_morph_properties,
     GP2DMORPHS_OT_set_frame_by_defined_pos,
     GP2DMORPHS_OT_fill_defined_frames,
     GP2DMORPHS_OT_set_all_interp_types,
@@ -1846,10 +1882,10 @@ def register_driver_funcs():
 @persistent
 def load_handler(dummy):
     register_driver_funcs()
-    for obj in bpy.data.objects:
-        if obj.type == 'ARMATURE':
+    for obj in bpy.data.objects:    #For some reason, drivers that use my custom interp functions won't work after reloading the file, and need the dependencies to be refreshed.
+        if obj.type == 'ARMATURE' and obj.animation_data:
             for fcurve in obj.animation_data.drivers:
-                fcurve.driver.expression = fcurve.driver.expression
+                fcurve.driver.expression = fcurve.driver.expression #Would be nice if we didn't have to do this
     
 def register():
     for cls in _classes:

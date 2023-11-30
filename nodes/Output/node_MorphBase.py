@@ -1,5 +1,5 @@
 import bpy
-from bpy.props import PointerProperty, IntProperty, CollectionProperty
+from bpy.props import PointerProperty, IntProperty, BoolProperty, CollectionProperty
 from ..BASE.node_base import GP2DMorphsNodeBase
 from ...props import GP2DMORPHS_OpProps
 from ...ui import GP2DMORPHSUIListItemString
@@ -10,7 +10,7 @@ class GP2DMorphsNodeMorphBase(GP2DMorphsNodeBase):
     bl_icon = 'GP_MULTIFRAME_EDITING'
 
     props: PointerProperty(type=GP2DMORPHS_OpProps)
-
+    lock_morph : BoolProperty(name="Lock Morph",default=False,description="Lock Morph so that its frames won't get updated when other nodes get updated")
     obj : PointerProperty(name="GPencil", type=bpy.types.Object, poll=lambda self, o: o.type == 'GPENCIL', description="The Grease Pencil Object that contains the layer(s) to be morphed")
     list_index : IntProperty()
     name_list : CollectionProperty(type=GP2DMORPHSUIListItemString)
@@ -28,7 +28,7 @@ class GP2DMorphsNodeMorphBase(GP2DMorphsNodeBase):
         #####Layer Name List#####
         if self.obj is not None:
             row = layout.row()
-            row.template_list("NODE_UL_string_search", "", self, "name_list", self, "list_index", rows=1)
+            row.template_list("NODE_UL_string_search", "morph_list" + self.name, self, "name_list", self, "list_index", rows=1)
             #ADD and REMOVE
             col = row.column(align=True)
             col.operator('gp2dmorphs.ui_list_new_item', text='',icon='ADD').node_name = self.name
@@ -47,6 +47,7 @@ class GP2DMorphsNodeMorphBase(GP2DMorphsNodeBase):
 
     
     def draw_buttons_ext(self, context, layout):
+        layout.prop(self,"lock_morph", icon='LOCKED' if self.lock_morph else 'UNLOCKED')
         layout.prop(self.props, "def_frame_start", text="Starting Frame")
         l_name = self.get_selected_name()
         if self.obj is not None and l_name != '':
@@ -121,7 +122,10 @@ class GP2DMorphsNodeMorphBase(GP2DMorphsNodeBase):
 
     def get_ctrlskt_connected_to(self,input_name):
         from ..Input.node_ControlBase import GP2DMorphsNodeControlBase  #I don't like this any more than you do
-        connected_skt = self.inputs[input_name].connected_socket
+        try:
+            connected_skt = self.inputs[input_name].connected_socket
+        except:
+            connected_skt = None
         if connected_skt is not None:
             input_node = connected_skt.node
             if issubclass(type(input_node),GP2DMorphsNodeControlBase):
