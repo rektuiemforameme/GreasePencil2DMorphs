@@ -3,6 +3,7 @@ from bpy.props import PointerProperty, BoolProperty
 from ..Output.node_MorphBase import GP2DMorphsNodeMorphBase
 from ...operators.ops import generate_2d_morphs_with_pg, update_gp_time_offset_and_driver
 from ...utils import get_flipped_name
+from ...draw_common import draw_options_mirror, draw_options_interpolate, draw_options_stroke_order
 
 class GP2DMorphsNodeGP2DMorph(GP2DMorphsNodeMorphBase):
     bl_idname = "GP2DMorphsNodeGP2DMorph"
@@ -49,63 +50,12 @@ class GP2DMorphsNodeGP2DMorph(GP2DMorphsNodeMorphBase):
 
             layout.prop(self.props, "gen_frame_start", text="Gen Starting Frame")
             layout.prop(self.props,"use_layer_pass")
-            box = layout.box()
-            col = box.column()
-            col.prop(self.props, "interpolate", text="Interpolate")
-
-            if self.props.interpolate:
-                row = layout.row()
-                row.label(icon='IPO_EASE_IN_OUT')
-                row.operator_menu_enum("GP2DMORPHS.set_all_interp_types","type", text="Set All").node_name = self.name
-                if self.props.interp_type_left != 'LINEAR' or self.props.interp_type_right != 'LINEAR' or self.props.interp_type_up != 'LINEAR' or self.props.interp_type_down != 'LINEAR':
-                    row.operator_menu_enum("GP2DMORPHS.set_all_interp_easings","easing", text="Set All").node_name = self.name
-                
-                if self.props.gen_frames_h > 1:
-                    row = layout.row()
-                    row.label(text="",icon='TRIA_UP')
-                    row.prop(self.props, "interp_type_up", text="")
-                    if self.props.interp_type_up == 'CUSTOM':
-                        row.label(text=":(",icon='ERROR')
-                    elif self.props.interp_type_up != 'LINEAR':
-                        row.prop(self.props, "interp_easing_up", text="")
-
-                    if self.props.def_frames_h > 2:
-                        row = layout.row()
-                        row.label(text="",icon='TRIA_DOWN')
-                        row.prop(self.props, "interp_type_down", text="")
-                        if self.props.interp_type_down == 'CUSTOM':
-                            row.label(text=":(",icon='ERROR')
-                        elif self.props.interp_type_down != 'LINEAR':
-                            row.prop(self.props, "interp_easing_down", text="")
-                if self.props.gen_frames_w > 1:
-                    if self.props.def_frames_w > 2:
-                        row = layout.row()
-                        row.label(text="",icon='TRIA_LEFT')
-                        row.prop(self.props, "interp_type_left", text="")
-                        if self.props.interp_type_left == 'CUSTOM':
-                            row.label(text=":(",icon='ERROR')
-                        elif self.props.interp_type_left != 'LINEAR':
-                            row.prop(self.props, "interp_easing_left", text="")
-
-                    row = layout.row()
-                    row.label(text="",icon='TRIA_RIGHT')
-                    row.prop(self.props, "interp_type_right", text="")
-                    if self.props.interp_type_right == 'CUSTOM':
-                        row.label(text=":(",icon='ERROR')
-                    elif self.props.interp_type_right != 'LINEAR':
-                        row.prop(self.props, "interp_easing_right", text="")
-
+            #Mirror
+            draw_options_mirror(context,layout,self.props)
+            #Interpolate
+            draw_options_interpolate(context,layout,self.props)
             #Stroke order settings
-            box = layout.box()
-            box.prop(self.props, "stroke_order_changes", text="Stroke Order Changes")
-            if self.props.stroke_order_changes:
-                box.label(text="Order change offset factor")
-                row = box.row()
-                h,v = self.props.def_frames_w > 1, self.props.def_frames_h > 1
-                if h:
-                    row.prop(self.props, "stroke_order_change_offset_factor_horizontal", text="Horizontal" if v else "")
-                if v:
-                    row.prop(self.props, "stroke_order_change_offset_factor_vertical", text="Vertical" if h else "")
+            draw_options_stroke_order(context,layout,self.props)
 
     def generate(self, context):
         self.update_props()

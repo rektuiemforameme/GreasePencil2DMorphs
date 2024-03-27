@@ -1,22 +1,26 @@
 import bpy
 from bpy.types import UIList
-from bpy.props import StringProperty, IntProperty
+from bpy.props import StringProperty, IntProperty, BoolProperty
 from bpy.app.handlers import persistent
 from .props import GP2DMORPHS_EditorProps
+from .draw_common import draw_def_array_frame_shortcuts, draw_options_mirror, draw_options_interpolate, draw_options_stroke_order
     
 class NODE_UL_string_search(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        split = layout.split(factor=0.08)
         node = data
-        split.label(text="",icon='LAYER_ACTIVE' if node.list_index == index else 'LAYER_USED')
+        row = layout.row(align=True)
+        row.label(text="",icon='LAYER_ACTIVE' if node.list_index == index else 'LAYER_USED')
+        if hasattr(node, 'props') and hasattr(node.props, 'mirror') and node.props.mirror:
+            row.prop(item, 'mirror', toggle=True, icon_only=True, icon='MOD_MIRROR')
         if node.bl_idname == 'GP2DMorphsNodeGP2DMorph':
-            split.prop_search(item, "name", node.obj.data, "layers", text="",icon='NONE')
+            row.prop_search(item, "name", node.obj.data, "layers", text="",icon='NONE')
         elif node.bl_idname == 'GP2DMorphsNodeBoneMorph':
-            split.prop_search(item, "name", node.obj.data, "bones", text="",icon='NONE')
+            row.prop_search(item, "name", node.obj.data, "bones", text="",icon='NONE')
 
 class GP2DMORPHSUIListItemString(bpy.types.PropertyGroup):
-    name : StringProperty()
+    name : StringProperty(name='Name')
     id : IntProperty()
+    mirror : BoolProperty(default=True, name='Mirror', description="Mirrors this item in the morph")
 
 class GP2DMORPHSPanel:
     bl_space_type = "VIEW_3D"
@@ -34,17 +38,16 @@ class GP2DMORPHS_PT_Options(GP2DMORPHSPanel, bpy.types.Panel):
     bl_idname = "GP2DMORPHS_PT_Options"
         
     def draw(self, context):
-        GP2DMORPHS_PT_OptionsSub.update_optionssub_class_vars()
+        GP2DMORPHS_PT_OptionsSub.update_optionssub_class_vars(context)
         box = self.layout.box()
         if GP2DMORPHS_PT_OptionsSub.use_nodes:
-            box.label(text='Using Nodes',icon='NODETREE')
             if GP2DMORPHS_PT_OptionsSub.active_node:
                 box.label(text=(GP2DMORPHS_PT_OptionsSub.active_node.label if GP2DMORPHS_PT_OptionsSub.active_node.label != '' else GP2DMORPHS_PT_OptionsSub.active_node.name),icon='NODE')
             else:
                 box.label(text="Active Node isn't a Morph",icon='ERROR')
         else:
             box.label(text='Not Using Nodes',icon='CANCEL')
-    
+
 class GP2DMORPHS_PT_OptionsSub(bpy.types.Panel):
     """Subpanel of the main GP2DMORPHS Panel"""
     bl_label = "Sub Panel"
@@ -59,8 +62,10 @@ class GP2DMORPHS_PT_OptionsSub(bpy.types.Panel):
     GP2DMORPHSVars = None
     obj = None
 
-    def update_optionssub_class_vars():
-        context = bpy.context
+    @staticmethod
+    def update_optionssub_class_vars(context=None):
+        if context is None:
+            context = bpy.context
         areas  = [area for area in context.window.screen.areas if area.ui_type == 'GP2DMorphsNodeTree' and area.spaces.active.node_tree is not None]
         GP2DMORPHS_PT_OptionsSub.active_node = None
         GP2DMORPHS_PT_OptionsSub.use_nodes = False
@@ -78,7 +83,7 @@ class GP2DMORPHS_PT_OptionsSub(bpy.types.Panel):
             obj_active = context.view_layer.objects.active
             GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars = obj_active.gp2dmorphs_panel_settings
             GP2DMORPHS_PT_OptionsSub.obj = obj_active
-    
+
 class GP2DMORPHS_PT_OptionsDefinedFrames(GP2DMORPHS_PT_OptionsSub):
     bl_label = "Defined Frames"
     bl_idname = "GP2DMORPHS_PT_OptionsDefinedFrames"
@@ -86,21 +91,15 @@ class GP2DMORPHS_PT_OptionsDefinedFrames(GP2DMORPHS_PT_OptionsSub):
     def draw(self, context):
         layout = self.layout
         #Defined Array Dimensions
-        layout.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "def_frame_start", text="Starting Frame")
+        morph_props = GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars
+        layout.prop(morph_props, "def_frame_start", text="Starting Frame")
         row = layout.row(align=True)
-        row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "def_frames_w", text="Width")
-        row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "def_frames_h", text="Height")
-        total_def_frames = GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_w*GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_h
+        row.prop(morph_props, "def_frames_w", text="Width")
+        row.prop(morph_props, "def_frames_h", text="Height")
+        total_def_frames = morph_props.def_frames_w*morph_props.def_frames_h
         layout.label(text='Total Defined Frames ' + str(total_def_frames))
-        box = layout.box()
-        col = box.column(align=True)
-        #Defined Array Frame shortcuts
-        for y in range(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_h-1,-1,-1):
-            row = col.row(align=True)
-            for x in range(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_w):
-                f = GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frame_start + y*(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_w+1) + x   #The frame that this button and position in the defined 'array' represents and links to
-                props = row.operator("GP2DMORPHS.set_frame_by_defined_pos", text = str(f), depress = f==context.scene.frame_current)
-                props.pos_x, props.pos_y, props.def_frame_start, props.def_frames_w = x, y, GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frame_start, GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_w
+        draw_def_array_frame_shortcuts(context, layout, morph_props)
+
         if GP2DMORPHS_PT_OptionsSub.obj.type == 'GPENCIL':
             if GP2DMORPHS_PT_OptionsSub.active_node:
                 n = GP2DMORPHS_PT_OptionsSub.active_node
@@ -111,97 +110,41 @@ class GP2DMORPHS_PT_OptionsDefinedFrames(GP2DMORPHS_PT_OptionsSub):
             else:
                 layout.operator("GP2DMORPHS.fill_defined_frames")
 
+        #Mirror
+        draw_options_mirror(context,layout,morph_props)
+
 class GP2DMORPHS_PT_OptionsGeneratedFrames(GP2DMORPHS_PT_OptionsSub):
     bl_label = "Generated Frames"
     bl_idname = "GP2DMORPHS_PT_OptionsGeneratedFrames"
 
     def draw(self, context):
         layout = self.layout
+        morph_props = GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars
         #Generated Array Dimensions
-        total_def_frames = GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_w*GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_h
+        total_def_frames = morph_props.def_frames_w*morph_props.def_frames_h
         row = layout.row()
-        if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.gen_frame_start < GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frame_start+total_def_frames+GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_h-1:      #If the gen start frame overlaps the defined frames, move it
+        if morph_props.gen_frame_start < morph_props.def_frame_start+total_def_frames+morph_props.def_frames_h-1:      #If the gen start frame overlaps the defined frames, move it
             row.alert = True
-        row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "gen_frame_start", text="Starting Frame")
+        row.prop(morph_props, "gen_frame_start", text="Starting Frame")
         row = layout.row(align=True)
-        row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "gen_frames_w", text="Width")
-        row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "gen_frames_h", text="Height")
-        layout.label(text='Total Generated Frames ' + str(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.gen_frames_w*GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.gen_frames_h))
+        row.prop(morph_props, "gen_frames_w", text="Width")
+        row.prop(morph_props, "gen_frames_h", text="Height")
+        layout.label(text='Total Generated Frames ' + str(morph_props.gen_frames_w*morph_props.gen_frames_h))
         #Interpolation
-        box = layout.box()
-        box.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "interpolate", text="Interpolate")
-
-        if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.interpolate:
-            row = box.row(align=True)
-            row.label(icon='IPO_EASE_IN_OUT')
-            if GP2DMORPHS_PT_OptionsSub.use_nodes and GP2DMORPHS_PT_OptionsSub.active_node:
-                row.operator_menu_enum("GP2DMORPHS.set_all_interp_types","type", text="Set All").node_name = GP2DMORPHS_PT_OptionsSub.active_node.name
-            else:
-                row.operator_menu_enum("GP2DMORPHS.set_all_interp_types","type", text="Set All")
-            
-            if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.interp_type_left != 'LINEAR' or GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.interp_type_right != 'LINEAR' or GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.interp_type_up != 'LINEAR' or GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.interp_type_down != 'LINEAR':
-                if GP2DMORPHS_PT_OptionsSub.use_nodes and GP2DMORPHS_PT_OptionsSub.active_node:
-                    row.operator_menu_enum("GP2DMORPHS.set_all_interp_easings","easing", text="Set All").node_name = GP2DMORPHS_PT_OptionsSub.active_node.name
-                else:
-                    row.operator_menu_enum("GP2DMORPHS.set_all_interp_easings","easing", text="Set All")
-            
-            if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.gen_frames_h > 1:
-                row = box.row(align=True)
-                row.label(text="",icon='TRIA_UP')
-                row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "interp_type_up", text="")
-                if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.interp_type_up == 'CUSTOM':
-                    row.label(text=":(",icon='ERROR')
-                elif GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.interp_type_up != 'LINEAR':
-                    row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "interp_easing_up", text="")
-
-                if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_h > 2:
-                    row = box.row(align=True)
-                    row.label(text="",icon='TRIA_DOWN')
-                    row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "interp_type_down", text="")
-                    if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.interp_type_down == 'CUSTOM':
-                        row.label(text=":(",icon='ERROR')
-                    elif GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.interp_type_down != 'LINEAR':
-                        row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "interp_easing_down", text="")
-            if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.gen_frames_w > 1:
-                if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_w > 2:
-                    row = box.row(align=True)
-                    row.label(text="",icon='TRIA_LEFT')
-                    row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "interp_type_left", text="")
-                    if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.interp_type_left == 'CUSTOM':
-                        row.label(text=":(",icon='ERROR')
-                    elif GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.interp_type_left != 'LINEAR':
-                        row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "interp_easing_left", text="")
-
-                row = box.row(align=True)
-                row.label(text="",icon='TRIA_RIGHT')
-                row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "interp_type_right", text="")
-                if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.interp_type_right == 'CUSTOM':
-                    row.label(text=":(",icon='ERROR')
-                elif GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.interp_type_right != 'LINEAR':
-                    row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "interp_easing_right", text="")
-
+        draw_options_interpolate(context,layout,morph_props,node_name=GP2DMORPHS_PT_OptionsSub.active_node.name if GP2DMORPHS_PT_OptionsSub.use_nodes and GP2DMORPHS_PT_OptionsSub.active_node else '')
         #Stroke order settings
-        box = layout.box()
-        box.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "stroke_order_changes", text="Stroke Order Changes")
-        if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.stroke_order_changes:
-            box.label(text="Order change offset factor")
-            row = box.row(align=True)
-            h,v = GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_w > 1, GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_h > 1
-            if h:
-                row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "stroke_order_change_offset_factor_horizontal", text="Horizontal" if v else "")
-            if v:
-                row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "stroke_order_change_offset_factor_vertical", text="Vertical" if h else "")
+        draw_options_stroke_order(context,layout,morph_props)
 
         #Generation buttons
         if GP2DMORPHS_PT_OptionsSub.active_node is None:
             box = layout.box()
             row = box.row(align=True)
-            row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "generate_frames_or_location", text="Frames", toggle=True)
+            row.prop(morph_props, "generate_frames_or_location", text="Frames", toggle=True)
             #if not GP2DMORPHS_PT_OptionsSub.use_nodes:
-            row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "generate_control_or_rotation", text="Control", toggle=True)
-            row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "generate_driver_or_scale", text="Driver", toggle=True)
+            row.prop(morph_props, "generate_control_or_rotation", text="Control", toggle=True)
+            row.prop(morph_props, "generate_driver_or_scale", text="Driver", toggle=True)
             row = box.row()
-            row.enabled = GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.generate_driver_or_scale or GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.generate_control_or_rotation or GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.generate_frames_or_location
+            row.enabled = morph_props.generate_driver_or_scale or morph_props.generate_control_or_rotation or morph_props.generate_frames_or_location
             row.operator("GP2DMORPHS.generate_2d_morphs", text = "Generate")
 
     @classmethod
@@ -218,18 +161,19 @@ class GP2DMORPHS_PT_OptionsGeneratedBoneDrivers(GP2DMORPHS_PT_OptionsSub):
 
     def draw(self, context):
         layout = self.layout
+        morph_props = GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars
         #Generation buttons
         box = layout.box()
         col = box.column()
         row = col.row(align=True)
-        row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "generate_frames_or_location", text="Location", toggle=True)
-        row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "generate_control_or_rotation", text="Rotation", toggle=True)
-        row.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "generate_driver_or_scale", text="Scale", toggle=True)
+        row.prop(morph_props, "generate_frames_or_location", text="Location", toggle=True)
+        row.prop(morph_props, "generate_control_or_rotation", text="Rotation", toggle=True)
+        row.prop(morph_props, "generate_driver_or_scale", text="Scale", toggle=True)
         if GP2DMORPHS_PT_OptionsSub.active_node is None:
-            options_selected = GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.generate_driver_or_scale or GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.generate_control_or_rotation or GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.generate_frames_or_location
+            options_selected = morph_props.generate_driver_or_scale or morph_props.generate_control_or_rotation or morph_props.generate_frames_or_location
             row = col.row()
             row.enabled = options_selected
-            opprops = row.operator("GP2DMORPHS.generate_2d_bone_morphs", text = "Create Drivers")
+            row.operator("GP2DMORPHS.generate_2d_bone_morphs", text = "Create Drivers")
             row = col.row()
             row.enabled = options_selected
             row.operator("GP2DMORPHS.remove_morph_drivers", text = "Remove Drivers")
@@ -248,15 +192,16 @@ class GP2DMORPHS_PT_OptionsControl(GP2DMORPHS_PT_OptionsSub):
 
     def draw(self, context):
         layout = self.layout
+        morph_props = GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars
         col = layout.column()
-        col.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "control_type", text="")
-        if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.control_type == 'BONE':
-            col.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "control_armature_x", text="", icon='ARMATURE_DATA')
-            if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.control_armature_x is not None:
-                col.prop_search(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "control_bone_name_x", GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.control_armature_x.data, "bones", text="")
-            col.prop(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "control_armature_y", text="", icon='ARMATURE_DATA')
-            if GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.control_armature_y is not None:
-                col.prop_search(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars, "control_bone_name_y", GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.control_armature_y.data, "bones", text="")
+        col.prop(morph_props, "control_type", text="")
+        if morph_props.control_type == 'BONE':
+            col.prop(morph_props, "control_armature_x", text="", icon='ARMATURE_DATA')
+            if morph_props.control_armature_x is not None:
+                col.prop_search(morph_props, "control_bone_name_x", morph_props.control_armature_x.data, "bones", text="")
+            col.prop(morph_props, "control_armature_y", text="", icon='ARMATURE_DATA')
+            if morph_props.control_armature_y is not None:
+                col.prop_search(morph_props, "control_bone_name_y", morph_props.control_armature_y.data, "bones", text="")
 
     @classmethod
     def poll(cls, context):
@@ -285,8 +230,9 @@ def draw_node_editor_header_append(self, context):
         row = layout.row(align=True)
         row.operator("gp2dmorphs.update_nodes", text = "Update Nodes", icon='FILE_REFRESH')
         row.prop(GP2DMORPHSEditorProps,"update_gp_frames",text="",icon='DECORATE_KEYFRAME')
+        row.prop(GP2DMORPHSEditorProps, "update_mirrors", text="", icon='MOD_MIRROR')
         row.prop(GP2DMORPHSEditorProps,"update_modifiers",text="",icon='MODIFIER')
-        
+
         layout.prop(GP2DMORPHSEditorProps,"selected_only",text="",icon='RESTRICT_SELECT_OFF')
         
         row = layout.row(align=True)

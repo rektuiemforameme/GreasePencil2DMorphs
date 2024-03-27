@@ -1,5 +1,5 @@
 import bpy
-from bpy.props import IntProperty, StringProperty
+from bpy.props import IntProperty, StringProperty, BoolProperty
 from bpy.types import UIList
 
 
@@ -13,6 +13,7 @@ class NODE_UL_string_ui_list(UIList):
 class StringUIListItem(bpy.types.PropertyGroup):
     name : StringProperty()
     id : IntProperty()
+    mirror : BoolProperty(default=True)
 
 
 def register():

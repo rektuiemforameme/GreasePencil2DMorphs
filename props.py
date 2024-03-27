@@ -1,5 +1,5 @@
 import bpy
-from bpy.props import IntProperty, FloatProperty, BoolProperty, EnumProperty, StringProperty, PointerProperty
+from bpy.props import IntProperty, FloatProperty, FloatVectorProperty, BoolProperty, BoolVectorProperty, EnumProperty, StringProperty, PointerProperty
 
 class GP2DMORPHS_OpProps(bpy.types.PropertyGroup):
     #Frame Generation
@@ -12,6 +12,23 @@ class GP2DMORPHS_OpProps(bpy.types.PropertyGroup):
     generate_frames_or_location: BoolProperty(name="generate_frames_or_location", default = True, description="Generate interpolated Frames from user-defined frames")
     generate_control_or_rotation: BoolProperty(name="generate_control_or_rotation", default = True, description="Generate Control Objects")
     generate_driver_or_scale: BoolProperty(name="generate_driver_or_scale", default = True, description="Generate Driver from Control to Generated frames")
+    #Mirror
+    mirror: BoolProperty(name="Mirror", default=False, description="""Duplicate and Flip user-defined frames to the opposite side of the user-defined array of morph frames. Useful for things such as head turns, so that you only need to create defined frames for the character looking from straight ahead to the right and the addon will generate the frames for looking to the left""")
+    mirror_paired_layers: BoolProperty(name="Paired Layers", default=False, description="Some layers in this morph are mirror opposites of each other, and the mirror operation should treat the strokes in these layers as if they are pairs of the corresponding strokes in the paired layer. Paired layers must have the same name, with one character different at the end. For example, 'EyeL' and 'EyeR'")
+    mirror_point_mode: EnumProperty(items=[('OBJ_ORIGIN', 'Object Origin', "Use this Object's Origin as the point to flip strokes across", 'OBJECT_ORIGIN', 0),
+                                      ('LAYER_TRANSFORM', 'Layer Transform', "Use the first Layer's Transform as the point to flip strokes across", 'TRANSFORM_ORIGINS', 1),
+                                      ('AXIS', 'Axis', "Use a Grid Axis as the point to flip strokes across", 'EMPTY_AXIS', 2),
+                                      ('CUSTOM', 'Custom Point', "Use a Custom point as the point to flip strokes across", 'CON_LOCLIMIT', 3)],
+                               name="Mirror Point Mode", description="")
+    mirror_use_axis_x: BoolProperty(name='Mirror Axis Use X', description="Flip strokes in each mirrored frame on the X axis", default=True)
+    mirror_use_axis_y: BoolProperty(name='Mirror Axis Use Y', description="Flip strokes in each mirrored frame on the Y axis", default=False)
+    mirror_use_axis_z: BoolProperty(name='Mirror Axis Use Z', description="Flip strokes in each mirrored frame on the Z axis", default=False)
+    mirror_direction: EnumProperty(items=[('LEFT', 'Right to Left',"Replace user-defined frames on the left side of the morph with flipped user-defined frames from the right side",'BACK', 0),
+                                           ('RIGHT', 'Left to Right',"Replace user-defined frames on the right side of the morph with flipped user-defined frames from the left side",'FORWARD', 1),
+                                          ('DOWN', 'Top to Bottom',"Replace user-defined frames on the bottom side of the morph with flipped user-defined frames from the top side", 'SORT_ASC', 2),
+                                           ('UP', 'Bottom to Top', "Replace user-defined frames on the top side of the morph with flipped user-defined frames from the bottom side",'SORT_DESC', 3)],
+                                    name="Mirror Point Mode", description="")
+    mirror_custom_point : FloatVectorProperty(name="Custom Point", description="The local point to mirror strokes across", subtype='XYZ')
     #Interpolation
     interpolate: BoolProperty(name="interpolate", default = True, description="Interpolate between defined frames. Without this, the addon will not generate any new frames and just reorganize the defined frames into the positions they would be in when generated.")
     
@@ -64,25 +81,22 @@ class GP2DMORPHS_EditorProps(bpy.types.PropertyGroup):
     selected_only: BoolProperty(name="Only Update Selected", default = True, description="Only update selected nodes")
     update_gp_frames: BoolProperty(name="Update GPencil Frames", default = True, description="Update GPencil Morph frames when updating")
     update_modifiers: BoolProperty(name="Update Modifiers and Drivers", default = True, description="Update modifiers and drivers when updating")
+    update_mirrors: BoolProperty(name="Update Morph Mirror Frames", default=True, description="Update Morph Mirror frames when updating")
     mode : EnumProperty(items = [('EDIT', 'Edit', 'Editing Rig', 'MOD_ARMATURE', 0), 
                                 ('ANIMATE', 'Animate', 'Animating Rig', 'ARMATURE_DATA',1)], name = "Mode", description = "")
     level_of_detail : EnumProperty(items = [('PREVIEW', 'Preview', 'Lower number of frames for performance while editing', 'MESH_PLANE', 0), 
                                             ('RENDER', 'Render', 'High number of frames for smooth transitions', 'VIEW_ORTHO',1)], default='RENDER', 
                                             name = "Level of Detail", description = "A small number of frames for less lag, or a large number for smoother transitions")
-
-_classes = [
-    GP2DMORPHS_OpProps,
-    GP2DMORPHS_EditorProps
-]
     
 def register():
-    for cls in _classes:
-        bpy.utils.register_class(cls)
+    bpy.utils.register_class(GP2DMORPHS_OpProps)
+    bpy.utils.register_class(GP2DMORPHS_EditorProps)
     bpy.types.Object.gp2dmorphs_panel_settings = PointerProperty(type=GP2DMORPHS_OpProps)
+
     
 
 def unregister():
-    for cls in _classes:
-        bpy.utils.unregister_class(cls)
+    bpy.utils.unregister_class(GP2DMORPHS_OpProps)
+    bpy.utils.unregister_class(GP2DMORPHS_EditorProps)
     del bpy.types.Object.gp2dmorphs_panel_settings
     

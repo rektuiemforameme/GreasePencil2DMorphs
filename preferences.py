@@ -1,24 +1,26 @@
 import bpy
 import rna_keymap_ui
-from bpy.props import StringProperty
+from bpy.props import StringProperty, BoolProperty
 
 from . import __folder_name__
 
-
 def get_pref():
     return bpy.context.preferences.addons.get(__folder_name__).preferences
-
 
 class GP2DMorphs_Preferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
     custom_shapes_collection : StringProperty(name="Custom Shapes Collection Name", default='Custom Shapes',
                                               description="The name of the collection to put control custom shape meshes in. Use 'None' to put them in the current collection")
+    use_custom_draw_def_grid_mirrored : BoolProperty(name="Custom Mirror Grid",
+                                                     description="Use a custom draw for the Defined Frames shortcut grid when Mirror is enabled for the morph that indicates the frames that are mirrored",
+                                                     default=True)
 
     def draw(self, context):
         layout = self.layout
         col = layout.column()
         col.prop(self, 'custom_shapes_collection')
+        col.prop(self, 'use_custom_draw_def_grid_mirrored')
         self.drawKeymap(context) #Maybe some day I'll get around to looking into this
 
     def drawKeymap(self,context):

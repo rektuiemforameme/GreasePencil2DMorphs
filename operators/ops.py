@@ -1,7 +1,7 @@
 import bpy
 import math
 import bl_math
-from bpy.props import IntProperty, FloatProperty, BoolProperty, EnumProperty, StringProperty
+from bpy.props import IntProperty, FloatProperty, FloatVectorProperty, BoolProperty, EnumProperty, StringProperty
 from bpy.app.handlers import persistent
 from ..preferences import get_pref
 from ..utils import get_tree,get_main_gp_morph_node
@@ -14,7 +14,7 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
     bl_options = {'UNDO'}
 
     props_set: BoolProperty(name="props_set", default = False)
-
+    # Frames
     def_frame_start: IntProperty(name="def_frame_start", default = 0, description="The starting frame for the user-defined frames")
     def_frames_w: IntProperty(name="def_frames_w", default = 3, description="The width of the '2D array' of user-defined frames",min=1)
     def_frames_h: IntProperty(name="def_frames_h", default = 3, description="The height of the '2D array' of user-defined frames",min=1)
@@ -24,7 +24,24 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
     generate_frames: BoolProperty(name="generate_frames", default = True, description="Generate interpolated Frames from user-defined frames")
     generate_control: BoolProperty(name="generate_control", default = True, description="Generate Control Objects")
     generate_driver: BoolProperty(name="generate_driver", default = True, description="Generate Driver from Control to Generated frames")
-
+    # Mirror
+    mirror: BoolProperty(name="Mirror", default=False, description="""Duplicate and Flip user-defined frames to the opposite side of the user-defined array of morph frames. Useful for things such as head turns, so that you only need to create defined frames for the character looking from straight ahead to the right and the addon will generate the frames for looking to the left""")
+    mirror_paired_layers: BoolProperty(name="Paired Layers", default=False, description="Some layers in this morph are mirror opposites of each other, and the mirror operation should treat the strokes in these layers as if they are pairs of the corresponding strokes in the paired layer. Paired layers must have the same name, with one character different at the end. For example, 'EyeL' and 'EyeR'")
+    mirror_point_mode: EnumProperty(items=[('OBJ_ORIGIN', 'Object Origin', "Use this Object's Origin as the point to flip strokes across", 'OBJECT_ORIGIN', 0),
+                                      ('LAYER_TRANSFORM', 'Layer Transform', "Use the first Layer's Transform as the point to flip strokes across", 'TRANSFORM_ORIGINS', 1),
+                                      ('AXIS', 'Axis', "Use a Grid Axis as the point to flip strokes across", 'EMPTY_AXIS', 2),
+                                      ('CUSTOM', 'Custom Point', "Use a Custom point as the point to flip strokes across", 'CON_LOCLIMIT', 3)],
+                               name="Mirror Point Mode", description="")
+    mirror_use_axis_x: BoolProperty(name='Mirror Axis Use X', description="Flip strokes in each mirrored frame on the X axis", default=True)
+    mirror_use_axis_y: BoolProperty(name='Mirror Axis Use Y', description="Flip strokes in each mirrored frame on the Y axis", default=False)
+    mirror_use_axis_z: BoolProperty(name='Mirror Axis Use Z', description="Flip strokes in each mirrored frame on the Z axis", default=False)
+    mirror_direction: EnumProperty(items=[('LEFT', 'Right to Left',"Replace user-defined frames on the left side of the morph with flipped user-defined frames from the right side",'BACK', 0),
+                                           ('RIGHT', 'Left to Right',"Replace user-defined frames on the right side of the morph with flipped user-defined frames from the left side",'FORWARD', 1),
+                                          ('DOWN', 'Top to Bottom',"Replace user-defined frames on the bottom side of the morph with flipped user-defined frames from the top side", 'SORT_ASC', 2),
+                                           ('UP', 'Bottom to Top', "Replace user-defined frames on the top side of the morph with flipped user-defined frames from the bottom side",'SORT_DESC', 3)],
+                                    name="Mirror Point Mode", description="")
+    mirror_custom_point : FloatVectorProperty(name="Custom Point", description="The local point to mirror strokes across", subtype='XYZ')
+    # Interpolation
     interpolate: BoolProperty(name="interpolate", default = True, description="Interpolate between defined frames. Without this, the addon will not generate any new frames and just reorganize the defined frames into the positions they would be in when generated.")
     
     interp_type_enum = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['type'].enum_items if ot.identifier != 'CUSTOM']
@@ -37,7 +54,7 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
     interp_easing_right : EnumProperty(name="Interpolation Easing", default='EASE_OUT', items = interp_easing_enum, description="Interpolation Easing in the right direction")
     interp_easing_up : EnumProperty(name="Interpolation Easing", default='EASE_OUT', items = interp_easing_enum, description="Interpolation Easing in the up direction")
     interp_easing_down : EnumProperty(name="Interpolation Easing", default='EASE_OUT', items = interp_easing_enum, description="Interpolation Easing in the down direction")
-
+    # Stroke Order
     stroke_order_changes: BoolProperty(name="Stroke Order Changes", default = False, description="The order of strokes in some frames can change. Slower, but necessary if the stroke order changes")
     stroke_order_change_offset_factor_horizontal : FloatProperty(name="Stroke Order Change Offset Factor Horizontal", default=0.5, 
                                                                         description="Factor for the distance between two frames that new interpolated stroke orders should change on the horizontal axis",
@@ -45,7 +62,7 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
     stroke_order_change_offset_factor_vertical : FloatProperty(name="Stroke Order Change Offset Factor Vertical", default=0.5, 
                                                                         description="Factor for the distance between two frames that new interpolated stroke orders should change on the vertical axis",
                                                                         min=0,max=1)
-    
+    # Control
     control_type : EnumProperty(name="Control Type", items = [('OBJECT',"Object",""),('BONE',"Armature Bone","")], default='BONE', description="Type of control to use")
     control_armature_x = None
     control_armature_name_x : StringProperty(name="Control Armature X", default='',description="The armature that has the bone to use as a control for the X axis of the morph")
@@ -70,6 +87,7 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
     gp_obj = None
     gp_obj_name : StringProperty()
     layers = None
+    layers_mirror = None    #Layers that should be mirrored
     pass_index: IntProperty(default=-2)
     use_custom_shapes : BoolProperty(name="Use Custom Shapes",default=True,description="Pose Bones will have Custom Shapes applied to them that correspond to their control")
     use_control_constraints : BoolProperty(name="Use Control Constraints",default=True,description="Knob Pose Bone will have constraints applied to it to limit its movement depending on the type of control")
@@ -93,6 +111,8 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
             if self.node is None or self.node.bl_idname != 'GP2DMorphsNodeGP2DMorph':   return {'CANCELLED'}
             self.gp_obj = self.node.obj
             self.layers = [l for name_item in self.node.name_list if (name_item.name != '' and (l := self.gp_obj.data.layers.get(name_item.name)))]
+            if self.mirror:
+                self.layers_mirror = {l:name_item.mirror for name_item in self.node.name_list if (name_item.name != '' and (l := self.gp_obj.data.layers.get(name_item.name)))}
 
         if self.props_set:  #Properties have already been set. Just need to set the two pointers for controls
             self.control_armature_x = bpy.data.objects.get(self.control_armature_name_x)
@@ -108,6 +128,8 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
         
         if self.gp_obj is None: return {'CANCELLED'}
 
+        if self.mirror:
+            pass
         if self.generate_frames:
             generate_morph_frames(self,context)
         ctrl_objs = list((None, None))
@@ -1562,6 +1584,14 @@ def generate_2d_morphs_with_pg(pg,node_name='',pass_index=-1,use_custom_shapes=T
         generate_frames=pg.generate_frames_or_location,
         generate_control=pg.generate_control_or_rotation,
         generate_driver=pg.generate_driver_or_scale,
+        mirror=pg.mirror,
+        mirror_point_mode=pg.mirror_point_mode,
+        mirror_use_axis_x=pg.mirror_use_axis_x,
+        mirror_use_axis_y=pg.mirror_use_axis_y,
+        mirror_use_axis_z=pg.mirror_use_axis_z,
+        mirror_direction=pg.mirror_direction,
+        mirror_custom_point=pg.mirror_custom_point,
+        mirror_paired_layers=pg.mirror_paired_layers,
         interpolate=pg.interpolate,
         interp_type_left=pg.interp_type_left,
         interp_type_right=pg.interp_type_right,

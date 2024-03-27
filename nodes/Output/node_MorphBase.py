@@ -1,8 +1,10 @@
 import bpy
+from math import floor, ceil
 from bpy.props import PointerProperty, IntProperty, BoolProperty, CollectionProperty
 from ..BASE.node_base import GP2DMorphsNodeBase
 from ...props import GP2DMORPHS_OpProps
 from ...ui import GP2DMORPHSUIListItemString
+from ...draw_common import draw_def_array_frame_shortcuts
 
 class GP2DMorphsNodeMorphBase(GP2DMorphsNodeBase):
     bl_idname = "GP2DMorphsNodeMorphBase"
@@ -12,7 +14,7 @@ class GP2DMorphsNodeMorphBase(GP2DMorphsNodeBase):
     props: PointerProperty(type=GP2DMORPHS_OpProps)
     lock_morph : BoolProperty(name="Lock Morph",default=False,description="Lock Morph so that its frames won't get updated when other nodes get updated")
     obj : PointerProperty(name="GPencil", type=bpy.types.Object, poll=lambda self, o: o.type == 'GPENCIL', description="The Grease Pencil Object that contains the layer(s) to be morphed")
-    list_index : IntProperty()
+    list_index : IntProperty(name='Active Item', description="The current selected item in the list")
     name_list : CollectionProperty(type=GP2DMORPHSUIListItemString)
 
     def init(self, context):
@@ -51,16 +53,8 @@ class GP2DMorphsNodeMorphBase(GP2DMorphsNodeBase):
         layout.prop(self.props, "def_frame_start", text="Starting Frame")
         l_name = self.get_selected_name()
         if self.obj is not None and l_name != '':
-            box = layout.box()
-            #Defined Array Frame shortcuts
-            col = box.column(align=True)
-            for y in range(self.props.def_frames_h-1,-1,-1):
-                row = col.row(align=True)
-                for x in range(self.props.def_frames_w):
-                    f = self.props.def_frame_start + y*(self.props.def_frames_w+1) + x   #The frame that this button and position in the defined 'array' represents and links to
-                    op_props = row.operator("GP2DMORPHS.set_frame_by_defined_pos", text = str(f), depress = f==context.scene.frame_current)
-                    op_props.pos_x, op_props.pos_y = x, y
-                    op_props.def_frame_start, op_props.def_frames_w = self.props.def_frame_start, self.props.def_frames_w
+            draw_def_array_frame_shortcuts(context, layout, self.props)
+
     #Handle new control being connected     TODO: Figure out why the hell this doesn't work. Any attempt to access link.to_socket or link.from_socket, or the sockets from the nodes given, will error
     # def insert_link(self, link):
     #     from ..Input.node_ControlBase import GP2DMorphsNodeControlBase  #I don't like this any more than you do
