@@ -1,0 +1,29 @@
+schema_version = "1.0.0"
+
+id = "gp2dmorphs"
+version = "1.2.0"
+name = "Grease Pencil 2D Morphs"
+tagline = "Generates 2D 'Morph' frames from user defined frames and manipulate them with controls and drivers. Includes a node editor to define morph-control relationships"
+maintainer = "Matt Thompson <MatthewSmithThompson@gmail.com>"
+type = "add-on"
+
+# Optional link to documentation, support, source files, etc
+website = "https://github.com/rektuiemforameme/GreasePencil2DMorphs/tree/main"
+
+# Optional list defined by Blender and server, see:
+# https://docs.blender.org/manual/en/dev/extensions/tags.html
+tags = ["Animation", "Rigging"]
+
+blender_version_min = "4.0.0"
+# Optional: maximum supported Blender version
+# blender_version_max = "5.1.0"
+
+# License conforming to https://spdx.org/licenses/ (use "SPDX: prefix)
+# https://docs.blender.org/manual/en/dev/extensions/licenses.html
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+# Optional: required by some licenses.
+copyright = [
+  "2023-2024 Matthew Thompson"
+]
