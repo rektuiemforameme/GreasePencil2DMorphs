@@ -2,8 +2,8 @@ import bpy
 from bpy.types import UIList
 from bpy.props import StringProperty, IntProperty, BoolProperty
 from bpy.app.handlers import persistent
-from .props import GP2DMORPHS_EditorProps
-from .draw_common import draw_def_array_frame_shortcuts, draw_options_mirror, draw_options_interpolate, draw_options_stroke_order
+from ..props import GP2DMORPHS_EditorProps
+from .ui_common import draw_def_array_frame_shortcuts, draw_options_mirror, draw_options_interpolate, draw_options_stroke_order
     
 class NODE_UL_string_search(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
@@ -252,6 +252,25 @@ def draw_node_editor_node_menu(self, context):
         layout.separator()
 
 @persistent
+def draw_overlay_gpencil_options_append(self, context):
+    #overlay = context.area.spaces.active.overlay
+    layout = self.layout
+    layout.separator(factor=1.5)
+    layout.label(text="Grease Pencil 2D Morphs")
+    row = layout.row()
+    row.prop(context.scene, "gp2dmorphs_use_mirror_stroke_pairs",text='')
+    rowception = row.row()
+    if not context.scene.gp2dmorphs_use_mirror_stroke_pairs:
+        rowception.enabled = False
+    rowception.prop(context.scene, "gp2dmorphs_mirror_stroke_pairs_opacity",text='Paired Strokes')
+    row = layout.row()
+    row.prop(context.scene, "gp2dmorphs_use_mirror_excluded_strokes",text='')
+    rowception = row.row()
+    if not context.scene.gp2dmorphs_use_mirror_excluded_strokes:
+        rowception.enabled = False
+    rowception.prop(context.scene, "gp2dmorphs_mirror_excluded_strokes_opacity",text='Excluded Strokes')
+
+@persistent
 def draw_pose_append(self, context):
     layout = self.layout
     layout.separator()
@@ -274,10 +293,12 @@ def register():
     bpy.types.NODE_HT_header.append(draw_node_editor_header_append)
     bpy.types.NODE_MT_node.append(draw_node_editor_node_menu)
     bpy.types.VIEW3D_MT_pose.append(draw_pose_append)
+    bpy.types.VIEW3D_PT_overlay_gpencil_options.append(draw_overlay_gpencil_options_append)
 
 def unregister():
     for cls in _classes:
         bpy.utils.unregister_class(cls)
     bpy.types.NODE_HT_header.remove(draw_node_editor_header_append)  
     bpy.types.NODE_MT_node.remove(draw_node_editor_node_menu)
-    bpy.types.VIEW3D_MT_pose.remove(draw_pose_append)          
+    bpy.types.VIEW3D_MT_pose.remove(draw_pose_append)
+    bpy.types.VIEW3D_PT_overlay_gpencil_options.remove(draw_overlay_gpencil_options_append)      

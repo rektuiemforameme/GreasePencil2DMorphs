@@ -1,5 +1,5 @@
 from math import floor
-from .preferences import get_pref
+from ..preferences import get_pref
 #Defined Array Frame shortcuts
 def draw_def_array_frame_shortcuts(context, layout, props):
     box = layout.box()
@@ -40,11 +40,11 @@ def draw_def_array_frame_shortcuts(context, layout, props):
         for y in range(dh-1,-1,-1):
             if (dh%2==1 and y == floor(dh/2)) or y == floor(dh/2)-1:
                 col = box.column(align=True)
+            mirrored = (props.mirror_direction == 'DOWN' and y < floor(dh/2)) or (props.mirror_direction == 'UP' and y >= (dh/2))
             row = col.row(align=True)
             for x in range(dw):
                 f = props.def_frame_start + y*(dw+1) + x   #The frame that this button and position in the defined 'array' represents and links to
-                if ((props.mirror_direction == 'DOWN' and y < floor(dh/2)) or
-                                          (props.mirror_direction == 'UP' and y >= (dh/2))):
+                if mirrored:
                     op_props = row.operator("GP2DMORPHS.set_frame_by_defined_pos", text = str(f), icon = 'MOD_MIRROR', depress = f==context.scene.frame_current)
                 else:
                     op_props = row.operator("GP2DMORPHS.set_frame_by_defined_pos", text = str(f), depress = f==context.scene.frame_current)

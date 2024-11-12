@@ -3,7 +3,7 @@ from bpy.props import PointerProperty, BoolProperty
 from ..Output.node_MorphBase import GP2DMorphsNodeMorphBase
 from ...operators.ops import generate_2d_morphs_with_pg, update_gp_time_offset_and_driver
 from ...utils import get_flipped_name
-from ...draw_common import draw_options_mirror, draw_options_interpolate, draw_options_stroke_order
+from ...drawing.ui_common import draw_options_mirror, draw_options_interpolate, draw_options_stroke_order
 
 class GP2DMorphsNodeGP2DMorph(GP2DMorphsNodeMorphBase):
     bl_idname = "GP2DMorphsNodeGP2DMorph"

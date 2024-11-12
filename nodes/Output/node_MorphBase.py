@@ -3,8 +3,8 @@ from math import floor, ceil
 from bpy.props import PointerProperty, IntProperty, BoolProperty, CollectionProperty
 from ..BASE.node_base import GP2DMorphsNodeBase
 from ...props import GP2DMORPHS_OpProps
-from ...ui import GP2DMORPHSUIListItemString
-from ...draw_common import draw_def_array_frame_shortcuts
+from ...drawing.ui import GP2DMORPHSUIListItemString
+from ...drawing.ui_common import draw_def_array_frame_shortcuts
 
 class GP2DMorphsNodeMorphBase(GP2DMorphsNodeBase):
     bl_idname = "GP2DMorphsNodeMorphBase"

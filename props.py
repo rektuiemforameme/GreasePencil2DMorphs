@@ -1,5 +1,5 @@
 import bpy
-from bpy.props import IntProperty, FloatProperty, FloatVectorProperty, BoolProperty, BoolVectorProperty, EnumProperty, StringProperty, PointerProperty
+from bpy.props import IntProperty, FloatProperty, FloatVectorProperty, BoolProperty, EnumProperty, StringProperty, PointerProperty
 
 class GP2DMORPHS_OpProps(bpy.types.PropertyGroup):
     #Frame Generation
@@ -92,6 +92,10 @@ def register():
     bpy.utils.register_class(GP2DMORPHS_OpProps)
     bpy.utils.register_class(GP2DMORPHS_EditorProps)
     bpy.types.Object.gp2dmorphs_panel_settings = PointerProperty(type=GP2DMORPHS_OpProps)
+    bpy.types.Scene.gp2dmorphs_use_mirror_stroke_pairs = BoolProperty(name="Show paired stokes for mirroring morphs when editing strokes")
+    bpy.types.Scene.gp2dmorphs_mirror_stroke_pairs_opacity = FloatProperty(name="Opacity for paired stokes", default=0.75, min=0,max=1)
+    bpy.types.Scene.gp2dmorphs_use_mirror_excluded_strokes = BoolProperty(name="Show excluded stokes for mirroring morphs when editing strokes")
+    bpy.types.Scene.gp2dmorphs_mirror_excluded_strokes_opacity = FloatProperty(name="Opacity for excluded stokes", default=0.75, min=0,max=1)
 
     
 
@@ -99,4 +103,8 @@ def unregister():
     bpy.utils.unregister_class(GP2DMORPHS_OpProps)
     bpy.utils.unregister_class(GP2DMORPHS_EditorProps)
     del bpy.types.Object.gp2dmorphs_panel_settings
+    del bpy.types.Scene.gp2dmorphs_use_mirror_stroke_pairs
+    del bpy.types.Scene.gp2dmorphs_mirror_stroke_pairs_opacity
+    del bpy.types.Scene.gp2dmorphs_use_mirror_excluded_strokes
+    del bpy.types.Scene.gp2dmorphs_mirror_excluded_strokes_opacity
     

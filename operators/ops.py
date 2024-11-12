@@ -31,7 +31,7 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
                                       ('LAYER_TRANSFORM', 'Layer Transform', "Use the first Layer's Transform as the point to flip strokes across", 'TRANSFORM_ORIGINS', 1),
                                       ('AXIS', 'Axis', "Use a Grid Axis as the point to flip strokes across", 'EMPTY_AXIS', 2),
                                       ('CUSTOM', 'Custom Point', "Use a Custom point as the point to flip strokes across", 'CON_LOCLIMIT', 3)],
-                               name="Mirror Point Mode", description="")
+                               name="Mirror Point Mode", description="") # type: ignore
     mirror_use_axis_x: BoolProperty(name='Mirror Axis Use X', description="Flip strokes in each mirrored frame on the X axis", default=True)
     mirror_use_axis_y: BoolProperty(name='Mirror Axis Use Y', description="Flip strokes in each mirrored frame on the Y axis", default=False)
     mirror_use_axis_z: BoolProperty(name='Mirror Axis Use Z', description="Flip strokes in each mirrored frame on the Z axis", default=False)
@@ -202,7 +202,15 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
         self.generate_frames=pg.generate_frames_or_location
         self.generate_control=pg.generate_control_or_rotation
         self.generate_driver=pg.generate_driver_or_scale
-        self.interpolate=pg.interpolate
+        self.mirror=pg.mirror                                           # Mirror
+        self.mirror_point_mode=pg.mirror_point_mode
+        self.mirror_use_axis_x=pg.mirror_use_axis_x
+        self.mirror_use_axis_y=pg.mirror_use_axis_y
+        self.mirror_use_axis_z=pg.mirror_use_axis_z
+        self.mirror_direction=pg.mirror_direction
+        self.mirror_custom_point=pg.mirror_custom_point
+        self.mirror_paired_layers=pg.mirror_paired_layers
+        self.interpolate=pg.interpolate                                 # Interpolation
         self.interp_type_left=pg.interp_type_left
         self.interp_type_right=pg.interp_type_right
         self.interp_type_up=pg.interp_type_up
@@ -211,10 +219,10 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
         self.interp_easing_right=pg.interp_easing_right
         self.interp_easing_up=pg.interp_easing_up
         self.interp_easing_down=pg.interp_easing_down
-        self.stroke_order_changes=pg.stroke_order_changes
+        self.stroke_order_changes=pg.stroke_order_changes               # Stroke Order
         self.stroke_order_change_offset_factor_horizontal=pg.stroke_order_change_offset_factor_horizontal
         self.stroke_order_change_offset_factor_vertical=pg.stroke_order_change_offset_factor_vertical
-        self.control_type=pg.control_type
+        self.control_type=pg.control_type                               # Control
         self.control_armature_name_x='' if pg.control_armature_x is None else pg.control_armature_x.name
         self.control_bone_name_x=pg.control_bone_name_x
         self.control_bone_transform_type_x=pg.control_bone_transform_type_x

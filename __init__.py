@@ -2,6 +2,7 @@ import importlib
 import sys
 import os
 from itertools import groupby
+from .drawing import overlays
 
 bl_info = {
     "name": "Grease Pencil 2D Morphs",
@@ -51,6 +52,8 @@ def register():
                 sys.modules[name].register()
             except ValueError:  # open template file may cause this problem
                 pass
+
+    overlays.make_draw_class()
 
 
 def unregister():
