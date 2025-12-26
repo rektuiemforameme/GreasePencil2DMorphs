@@ -1,5 +1,6 @@
 import bpy
 import math
+import numpy as np
 import bl_math
 from bpy.props import IntProperty, FloatProperty, BoolProperty, EnumProperty, StringProperty
 from bpy.app.handlers import persistent
@@ -27,12 +28,12 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
 
     interpolate: BoolProperty(name="interpolate", default = True, description="Interpolate between defined frames. Without this, the addon will not generate any new frames and just reorganize the defined frames into the positions they would be in when generated.")
     
-    interp_type_enum = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['type'].enum_items if ot.identifier != 'CUSTOM']
+    interp_type_enum = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.grease_pencil.interpolate_sequence.get_rna_type().properties['type'].enum_items if ot.identifier != 'CUSTOM']
     interp_type_left : EnumProperty(name="Interpolation Type", items = interp_type_enum, description="Interpolation Type in the left direction")
     interp_type_right : EnumProperty(name="Interpolation Type", items = interp_type_enum, description="Interpolation Type in the right direction")
     interp_type_up : EnumProperty(name="Interpolation Type", items = interp_type_enum, description="Interpolation Type in the up direction")
     interp_type_down : EnumProperty(name="Interpolation Type", items = interp_type_enum, description="Interpolation Type in the down direction")
-    interp_easing_enum = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['easing'].enum_items if ot.identifier != 'AUTO']
+    interp_easing_enum = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.grease_pencil.interpolate_sequence.get_rna_type().properties['easing'].enum_items if ot.identifier != 'AUTO']
     interp_easing_left : EnumProperty(name="Interpolation Easing", default='EASE_OUT', items = interp_easing_enum, description="Interpolation Easing in the left direction")
     interp_easing_right : EnumProperty(name="Interpolation Easing", default='EASE_OUT', items = interp_easing_enum, description="Interpolation Easing in the right direction")
     interp_easing_up : EnumProperty(name="Interpolation Easing", default='EASE_OUT', items = interp_easing_enum, description="Interpolation Easing in the up direction")
@@ -123,18 +124,18 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
                     trans_limits[trans_type] = {'X':None,'Y':None,'Z':None}
                 trans_limits[trans_type][self.control_bone_transform_type_y[-1]] = (-0.5,0.5) if trans_type != 'R' else (self.control_range_start_y,self.control_range_end_y)
             ctrl_objs[0] = get_or_create_control(self.control_type,
-                                           self.gp_obj.name + self.gp_obj.data.layers.active.info + "Control" if (self.control_type=='OBJECT' or self.control_bone_name_x=='' ) else self.control_bone_name_x,
+                                           self.gp_obj.name + self.gp_obj.data.layers.active.name + "Control" if (self.control_type=='OBJECT' or self.control_bone_name_x=='' ) else self.control_bone_name_x,
                                            self.control_armature_name_x,self.use_custom_shapes,self.use_control_constraints, trans_limits)
             ctrl_objs[1] = (get_or_create_control(self.control_type,
-                                           self.gp_obj.name + self.gp_obj.data.layers.active.info + "Control" if (self.control_type=='OBJECT' or self.control_bone_name_y=='' ) else self.control_bone_name_y,
+                                           self.gp_obj.name + self.gp_obj.data.layers.active.name + "Control" if (self.control_type=='OBJECT' or self.control_bone_name_y=='' ) else self.control_bone_name_y,
                                         self.control_armature_name_y,self.use_custom_shapes,self.use_control_constraints, trans_limits) 
                                         if self.control_armature_name_y != self.control_armature_name_x or self.control_bone_name_y != self.control_bone_name_x else ctrl_objs[0])
         else:
             ctrl_objs[0] = get_control(self.control_type,
-                                           self.gp_obj.name + self.gp_obj.data.layers.active.info + "Control" if (self.control_type=='OBJECT' or self.control_bone_name_x=='' ) else self.control_bone_name_x,
+                                           self.gp_obj.name + self.gp_obj.data.layers.active.name + "Control" if (self.control_type=='OBJECT' or self.control_bone_name_x=='' ) else self.control_bone_name_x,
                                            self.control_armature_name_x)
             ctrl_objs[1] = get_control(self.control_type,
-                                           self.gp_obj.name + self.gp_obj.data.layers.active.info + "Control" if (self.control_type=='OBJECT' or self.control_bone_name_y=='' ) else self.control_bone_name_y,
+                                           self.gp_obj.name + self.gp_obj.data.layers.active.name + "Control" if (self.control_type=='OBJECT' or self.control_bone_name_y=='' ) else self.control_bone_name_y,
                                            self.control_armature_name_y)
             
         if self.generate_driver:
@@ -157,14 +158,14 @@ class GP2DMORPHS_OT_generate_2d_morphs(bpy.types.Operator):
         expr = (str(self.gen_frame_start) + x_comp + y_comp)    #Driver Expression. It's the same for all modifiers
         if self.pass_index > -1:    #Use the pass index
             mod_name = (self.node.get_morph_name() + 'TO') if self.node else ''
-            mod = update_gp_time_offset_modifier(self.gp_obj,[l.info for l in self.layers if l],mod_name,self.pass_index,self.mode)
+            mod = update_gp_time_offset_modifier(self.gp_obj,[l.name for l in self.layers if l],mod_name,self.pass_index,self.mode)
             driver = create_ctrl_driver(bpy.context,ctrl_objs[0],ctrl_objs[1],mod,"offset",
                                             control_transform_type_x=self.control_bone_transform_type_x,control_transform_type_y=self.control_bone_transform_type_y) #mode should be ANIMATE no matter what because the driver doesn't care for GP Morphs
             driver.expression = expr
         else:                       #Use the layer(s)
             mod_name = (self.node.get_morph_name() + 'TO') if self.node and len(self.layers) < 2 else ''
             for layer in self.layers:
-                mod = update_gp_time_offset_modifier(self.gp_obj,[layer.info],mod_name,self.pass_index,self.mode)
+                mod = update_gp_time_offset_modifier(self.gp_obj,[layer.name],mod_name,self.pass_index,self.mode)
                 driver = create_ctrl_driver(bpy.context,ctrl_objs[0],ctrl_objs[1],mod,"offset",
                                                 control_transform_type_x=self.control_bone_transform_type_x,control_transform_type_y=self.control_bone_transform_type_y) #mode should be ANIMATE no matter what because the driver doesn't care for GP Morphs
                 driver.expression = expr
@@ -230,12 +231,12 @@ class GP2DMORPHS_OT_convert_defined_range(bpy.types.Operator):
     #Interpolation
     interpolate: BoolProperty(name="interpolate", default = True, description="Interpolate between defined frames. Without this, the addon will not generate any new frames and just reorganize the defined frames into the positions they would be in when generated.")
     
-    interp_type_enum = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['type'].enum_items if ot.identifier != 'CUSTOM']
+    interp_type_enum = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.grease_pencil.interpolate_sequence.get_rna_type().properties['type'].enum_items if ot.identifier != 'CUSTOM']
     interp_type_left : EnumProperty(name="Interpolation Type", items = interp_type_enum, description="Interpolation Type in the left direction")
     interp_type_right : EnumProperty(name="Interpolation Type", items = interp_type_enum, description="Interpolation Type in the right direction")
     interp_type_up : EnumProperty(name="Interpolation Type", items = interp_type_enum, description="Interpolation Type in the up direction")
     interp_type_down : EnumProperty(name="Interpolation Type", items = interp_type_enum, description="Interpolation Type in the down direction")
-    interp_easing_enum = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['easing'].enum_items if ot.identifier != 'AUTO']
+    interp_easing_enum = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.grease_pencil.interpolate_sequence.get_rna_type().properties['easing'].enum_items if ot.identifier != 'AUTO']
     interp_easing_left : EnumProperty(name="Interpolation Easing", default='EASE_OUT', items = interp_easing_enum, description="Interpolation Easing in the left direction")
     interp_easing_right : EnumProperty(name="Interpolation Easing", default='EASE_OUT', items = interp_easing_enum, description="Interpolation Easing in the right direction")
     interp_easing_up : EnumProperty(name="Interpolation Easing", default='EASE_OUT', items = interp_easing_enum, description="Interpolation Easing in the up direction")
@@ -279,9 +280,9 @@ class GP2DMORPHS_OT_convert_defined_range(bpy.types.Operator):
                 for layer in self.layers:
                     for frame in layer.frames:
                         if frame.frame_number >= self.def_frame_start and frame.frame_number <= def_frame_end:      #Remove old defined frames
-                            layer.frames.remove(frame)
+                            layer.frames.remove(frame.frame_number)
                         elif frame.frame_number >= self.gen_frame_start and frame.frame_number <= gen_frame_end:    #Move new defined frames into position and make them keyframes
-                            frame.frame_number = self.def_frame_start + (frame.frame_number - self.gen_frame_start)
+                            layer.frames.move(frame.frame_number, self.def_frame_start + (frame.frame_number - self.gen_frame_start))
                             frame.keyframe_type = 'KEYFRAME'
                     
                 #Change the morph's defined frames to match
@@ -677,11 +678,11 @@ class GP2DMORPHS_OT_remove_morph_drivers(bpy.types.Operator):
             self.remove_rotation = GP2DMORPHSVars.generate_control_or_rotation
             self.remove_scale = GP2DMORPHSVars.generate_driver_or_scale
 
-        if obj.type == 'GPENCIL':
+        if obj.type == 'GREASEPENCIL':
             layer = obj.data.layers.active
             #GP Time Offset Modifier
-            mod_name = obj.name + layer.info + "TO"
-            mod = obj.grease_pencil_modifiers.get(mod_name)
+            mod_name = obj.name + layer.name + "TO"
+            mod = obj.modifiers.get(mod_name)
             if mod is not None:
                 mod.driver_remove("offset")
         elif obj.type == 'ARMATURE':
@@ -717,26 +718,26 @@ class GP2DMORPHS_OT_remove_morph_properties(bpy.types.Operator):
         return {'FINISHED'}
 
 class GP2DMORPHS_OT_interpolate_sequence_disorderly(bpy.types.Operator):
-    bl_idname = "gpencil.interpolate_sequence_disorderly"    
+    bl_idname = "grease_pencil.interpolate_sequence_disorderly"    
     bl_label = "Interpolate Sequence Disorderly"
     bl_description = "Interpolates between two Grease Pencil Frames like Interpolate Sequence, but can handle different stroke orders"
     bl_options = {'REGISTER', 'UNDO'}
     step : IntProperty(name="Step",description="Number of frames between generated interpolated frames",default=1,min=1,max=1048573)
     layers : EnumProperty(name="Layer", 
-                                  items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['layers'].enum_items], 
+                                  items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.grease_pencil.interpolate_sequence.get_rna_type().properties['layers'].enum_items], 
                                   description="Layers included in the interpolation",default='ACTIVE')
     interpolate_selected_only : BoolProperty(name="Only Selected", description="Interpolate only selected strokes",default=False)
     exclude_breakdowns : BoolProperty(name="Exclude Breakdowns", description="Exclude existing Breakdowns keyframes as interpolation extremes",default=False)
     flip : EnumProperty(name="Flip Mode", 
-                                  items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['flip'].enum_items], 
+                                  items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.grease_pencil.interpolate_sequence.get_rna_type().properties['flip'].enum_items], 
                                   description="Invert destination stroke to match start and end with source stroke", default='AUTO')
     smooth_steps : IntProperty(name="Iterations",description="Number of times to smooth newly created strokes",default=1,min=1,max=3)
     smooth_factor : FloatProperty(name="Smooth",description="Amount of smoothing to apply to interpolated strokes, to reduce jitter/noise",default=0.0,min=0.0,max=2.0)
     type : EnumProperty(name="Interpolation Type", 
-                                  items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['type'].enum_items if ot.identifier != 'CUSTOM'], 
+                                  items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.grease_pencil.interpolate_sequence.get_rna_type().properties['type'].enum_items if ot.identifier != 'CUSTOM'], 
                                   description="Interpolation Type in the left direction")
     easing : EnumProperty(name="Interpolation Easing", default='EASE_OUT', 
-                                    items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['easing'].enum_items], 
+                                    items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.grease_pencil.interpolate_sequence.get_rna_type().properties['easing'].enum_items], 
                                     description="Interpolation Easing in the left direction")
     back : FloatProperty(name="Back",description="Amount of overshoot for ‘back’ easing",default=1.702,min=0.0)
     amplitude : FloatProperty(name="Amplitude",description="Amount to boost elastic bounces for ‘elastic’ easing",default=0.15,min=0.0)
@@ -751,6 +752,9 @@ class GP2DMORPHS_OT_interpolate_sequence_disorderly(bpy.types.Operator):
             context = bpy.context
         gp = context.view_layer.objects.active.data
         original_frame = context.scene.frame_current
+        original_select_mode = context.tool_settings.gpencil_selectmode_edit 
+        if original_select_mode != 'STROKE':
+            context.tool_settings.gpencil_selectmode_edit = 'STROKE'
         for layer in ([gp.layers.active] if self.layers == 'ACTIVE' else gp.layers):
             if layer.lock:
                 continue
@@ -764,14 +768,16 @@ class GP2DMORPHS_OT_interpolate_sequence_disorderly(bpy.types.Operator):
                         frame_to = frame
             if frame_from is None or frame_to is None:  #Failure. We'll get 'em next time.
                 self.report({'ERROR'}, "Cannot find valid keyframes to interpolate (Breakdowns keyframes are not allowed)")
+                context.tool_settings.gpencil_selectmode_edit = original_select_mode
                 return {'CANCELLED'}
-            elif len(frame_from.strokes) == 0 or len(frame_to.strokes) == 0 or frame_to.frame_number-frame_from.frame_number < 2:
+            elif frame_from.drawing.attributes.domain_size('CURVE') == 0 or frame_to.drawing.attributes.domain_size('CURVE') == 0 or frame_to.frame_number-frame_from.frame_number < 2:
                 continue
+            drawing_from = frame_from.drawing
+            drawing_to = frame_to.drawing
             orders_different = False
             order_change = list()
-            for i in range(len(frame_from.strokes.values())):   #Find the differences between the two frames' stroke orders, if any
-                stroke_from = frame_from.strokes.values()[i]
-                to_index = self.get_stroke_index(frame_to.strokes, stroke_from,i)
+            for i in range(drawing_from.attributes.domain_size('CURVE')):   #Find the differences between the two frames' stroke orders, if any
+                to_index = self.get_stroke_index(drawing_from,drawing_to,i)
                 order_change.append(to_index)
                 if to_index != i:       #A difference in stroke order was found. *Sigh* Now we'll have to actually do some work...
                     orders_different = True
@@ -779,10 +785,10 @@ class GP2DMORPHS_OT_interpolate_sequence_disorderly(bpy.types.Operator):
             if orders_different:       
                 #Reoder the To frame to have the same stroke order as the From frame so that interp doesn't fuck up
                 context.scene.frame_set(frame_to.frame_number)
-                self.strokes_order(frame_to.strokes,order_change)
+                self.strokes_order(drawing_to,order_change)
                 context.scene.frame_current = frame_to.frame_number-1
                 #Interpolate
-                interpolate_sequence_view_independent(context,step=self.step,layers=self.layers,interpolate_selected_only=self.interpolate_selected_only,
+                interpolate_sequence_view_independent(context,step=self.step,layers=self.layers,
                                              exclude_breakdowns=self.exclude_breakdowns,flip=self.flip,smooth_steps=self.smooth_steps,smooth_factor=self.smooth_factor,
                                              type=self.type,easing=self.easing,back=self.back,amplitude=self.amplitude,period=self.period)
                 #Now go back and change the To frame and some frames between to have the original To frame stroke order
@@ -793,13 +799,14 @@ class GP2DMORPHS_OT_interpolate_sequence_disorderly(bpy.types.Operator):
                         break
                     if frame.frame_number > frame_from.frame_number+reorder_num and frame.frame_number <= frame_to.frame_number:    #This is one of the frames we want to reorder
                         context.scene.frame_set(frame.frame_number)
-                        self.strokes_order(frame.strokes,order_change,undo=True)
+                        self.strokes_order(frame.drawing,order_change,undo=True)
             else:
                 #No stroke order changes, so just interpolate like normal
-                interpolate_sequence_view_independent(context,step=self.step,layers=self.layers,interpolate_selected_only=self.interpolate_selected_only,
+                interpolate_sequence_view_independent(context,step=self.step,layers=self.layers,
                                                 exclude_breakdowns=self.exclude_breakdowns,flip=self.flip,smooth_steps=self.smooth_steps,smooth_factor=self.smooth_factor,
                                                 type=self.type,easing=self.easing,back=self.back,amplitude=self.amplitude,period=self.period)
             context.scene.frame_current = original_frame
+        context.tool_settings.gpencil_selectmode_edit = original_select_mode
         return {'FINISHED'}
     
     def draw(self, context):
@@ -840,47 +847,43 @@ class GP2DMORPHS_OT_interpolate_sequence_disorderly(bpy.types.Operator):
         col1.label(text="Change Offset")
         col2.prop(self, "stroke_order_change_offset_factor",text="")
     
-    def get_stroke_index(self, strokes, target, expected_index=0):
-        if self.strokes_equal(strokes.values()[expected_index], target):
-            return expected_index
-        for i in range(expected_index+1,len(strokes.values())):
-            if self.strokes_equal(strokes.values()[i], target):
+    def get_stroke_index(self, d1, d2, target_index):
+        if self.strokes_equal(d1,d2,target_index,target_index):
+            return target_index
+        for i in range(target_index+1, min(d1.attributes.domain_size('CURVE'), d2.attributes.domain_size('CURVE'))):
+            if self.strokes_equal(d1,d2,target_index,i):
                 return i
-        for i in range(expected_index-1,-1,-1):
-            if self.strokes_equal(strokes.values()[i], target):
+        for i in range(target_index-1,-1,-1):
+            if self.strokes_equal(d1,d2,target_index,i):
                 return i
-        return expected_index
-
-    def strokes_equal(self, s1, s2):
-        if s1.time_start == s2.time_start:
-            if s1.time_start == 0:      #If both time_starts are 0, try other methods to compare them because time_start is invalid.
-                if len(s1.points) != len(s2.points):
+        return target_index
+    #d = Drawing, si = Stroke Index
+    def strokes_equal(self, d1, d2, si1, si2):
+        init_time_1 = d1.attributes["init_time"].data[si1].value 
+        if  init_time_1 == d2.attributes["init_time"].data[si2].value: 
+            if init_time_1 == 0:      #If both init_times are 0, try other methods to compare them because init_time is invalid.
+                if d1.attributes["material_index"].data[si1].value != d2.attributes["material_index"].data[si2].value:
                     return False
-                if s1.material_index != s2.material_index:
-                    return False
-                return (s1.vertex_color_fill[0] == s2.vertex_color_fill[0] and
-                        s1.vertex_color_fill[1] == s2.vertex_color_fill[1] and
-                        s1.vertex_color_fill[2] == s2.vertex_color_fill[2] and
-                        s1.vertex_color_fill[3] == s2.vertex_color_fill[3]) #Final check. If the v-color is the same, then either it's the same stroke or there's no way for us to know for sure.
+                return d1.attributes.domain_size('POINT') == d2.attributes.domain_size('POINT') #Final check. If the point counts are the same, then either it's the same stroke or there's no way for us to know for sure.
             else:
                 return True
         return False
     
-    def strokes_order(self, strokes, order_change, undo=False):
-        bpy.ops.gpencil.select_all(action='DESELECT')
+    def strokes_order(self, drawing, order_change, undo=False):
+        bpy.ops.grease_pencil.select_all(action='DESELECT')
         stroke_order_old = list()
         for i in range(len(order_change)-1,-1,-1):
-            stroke_order_old.append(strokes[order_change.index(i) if undo else order_change[i]])
-
-        for s in stroke_order_old:
-            s.select = True
-            bpy.ops.gpencil.stroke_arrange(direction='BOTTOM')
-            s.select = False
+            stroke_order_old.append(order_change.index(i) if undo else order_change[i])
+        stroke_selections = drawing.attributes['.selection']
+        for si in stroke_order_old:
+            stroke_selections.data[si].value = True
+            bpy.ops.grease_pencil.reorder(direction='BOTTOM')
+            stroke_selections.data[si].value = False
     
     @classmethod
     def poll(cls, context):
         ob = context.object
-        return ob and ob.type == 'GPENCIL' and (ob.mode == 'EDIT_GPENCIL' or ob.mode == 'PAINT_GPENCIL') 
+        return ob and ob.type == 'GREASEPENCIL' and (ob.mode == 'EDIT' or ob.mode == 'PAINT_GREASE_PENCIL') 
 
 class GP2DMORPHS_OT_set_frame_by_defined_pos(bpy.types.Operator):
     bl_idname = "gp2dmorphs.set_frame_by_defined_pos"    
@@ -950,9 +953,8 @@ class GP2DMORPHS_OT_fill_defined_frames(bpy.types.Operator):
         for dx in range(dw):
             for dy in range(dh):
                 if def_frames[dx][dy] is None:
-                    new_frame = layer.frames.copy(src_frame)
-                    new_frame.frame_number = def_array_pos_to_def_frame_pos(dx,dy,self.def_frame_start,dw)
-        refresh_GP_dopesheet(context)
+                    layer.frames.copy(src_frame.frame_number, def_array_pos_to_def_frame_pos(dx,dy,self.def_frame_start,dw), instance_drawing=False)
+        # refresh_GP_dopesheet(context)
         layer.lock = original_lock
         self.gp_obj.data.layers.active = original_layer
         context.view_layer.objects.active = original_active_obj
@@ -969,7 +971,7 @@ class GP2DMORPHS_OT_set_all_interp_types(bpy.types.Operator):
     type: EnumProperty(
         name="Type",
         description="The type of interpolation to use in this direction",
-        items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['type'].enum_items if ot.identifier != 'CUSTOM'],
+        items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.grease_pencil.interpolate_sequence.get_rna_type().properties['type'].enum_items if ot.identifier != 'CUSTOM'],
         default='LINEAR',
     )
 
@@ -995,7 +997,7 @@ class GP2DMORPHS_OT_set_all_interp_easings(bpy.types.Operator):
     easing: EnumProperty(
         name="easing",
         description="The easing for interpolation to use in this direction",
-        items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['easing'].enum_items if ot.identifier != 'AUTO'],
+        items = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.grease_pencil.interpolate_sequence.get_rna_type().properties['easing'].enum_items if ot.identifier != 'AUTO'],
         default='EASE_OUT',
         
     )
@@ -1173,25 +1175,25 @@ def get_gp_time_offset_modifier(gp_obj,layer_name,mod_name='',pass_index=-2,mode
     #GP Time Offset Modifier
     mod = None
     if pass_index > -1:    #Use the pass index to find the modifier
-        for m in gp_obj.grease_pencil_modifiers:
-            if m.type == 'GP_TIME':
-                if m.layer_pass == pass_index:
+        for m in gp_obj.modifiers:
+            if m.type == 'GREASE_PENCIL_TIME':
+                if m.layer_pass_filter == pass_index:
                     mod = m
                     break
     else:                       #Use the layer to find the modifier
-        for m in gp_obj.grease_pencil_modifiers:
-            if m.type == 'GP_TIME':
-                if m.layer == layer_name:
+        for m in gp_obj.modifiers:
+            if m.type == 'GREASE_PENCIL_TIME':
+                if m.layer_filter == layer_name:
                     mod = m
                     break
     if mod is None:         #If we don't have a modifier yet, make one
         if mod_name == '':
             mod_name = gp_obj.name + layer_name + "TO"
-        mod = gp_obj.grease_pencil_modifiers.new(name=mod_name, type='GP_TIME')
+        mod = gp_obj.modifiers.new(name=mod_name, type='GREASE_PENCIL_TIME')
         if pass_index > -1:
-            mod.layer_pass = pass_index
+            mod.layer_pass_filter = pass_index
         else:
-            mod.layer = layer_name
+            mod.layer_filter = layer_name
         mod.mode = 'FIX'
         if mode == 'EDIT':
             mod.show_viewport = False
@@ -1205,37 +1207,37 @@ def update_gp_time_offset_modifier(gp_obj,layer_names,mod_name='',pass_index=-2,
     main_layer = None if len(layer_names) == 0 else gp_obj.data.layers.get(layer_names[0])
     mod = None
     if pass_index > -1:    #Use the pass index to find the modifier
-        for m in gp_obj.grease_pencil_modifiers:
-            if m.type == 'GP_TIME':
-                if m.layer_pass == pass_index:
+        for m in gp_obj.modifiers:
+            if m.type == 'GREASE_PENCIL_TIME':
+                if m.layer_pass_filter == pass_index:
                     if mod is None:
                         mod = m
                     else:
                         mods_to_remove.append(m)    #Duplicate modifier. Remove.
-                elif m.layer in layer_names:      #This modifier will conflict with ours. Probably a remnant of using different settings. Mark it for removal.
+                elif m.layer_filter in layer_names:      #This modifier will conflict with ours. Probably a remnant of using different settings. Mark it for removal.
                     mods_to_remove.append(m)
     else:                       #Use the layer to find the modifier
-        for m in gp_obj.grease_pencil_modifiers:
-            if m.type == 'GP_TIME':
-                if m.layer == main_layer.info:
+        for m in gp_obj.modifiers:
+            if m.type == 'GREASE_PENCIL_TIME':
+                if m.layer_filter == main_layer.name:
                     if mod is None:
                         mod = m
                     else:
                         mods_to_remove.append(m)    #Duplicate modifier. Remove.
-                elif m.layer_pass != 0 and m.layer_pass == main_layer.pass_index:      #This modifier will conflict with ours. Probably a remnant of using different settings. Mark it for removal.
+                elif m.layer_pass_filter != 0 and m.layer_pass_filter == main_layer.pass_index:      #This modifier will conflict with ours. Probably a remnant of using different settings. Mark it for removal.
                     mods_to_remove.append(m)
     for i in range(len(mods_to_remove)-1,-1,-1):    #Remove conflicting modifiers
         m = mods_to_remove[i]
         m.driver_remove("offset")
-        gp_obj.grease_pencil_modifiers.remove(m)
+        gp_obj.modifiers.remove(m)
     if mod is None:         #If we don't have a modifier yet, make one
         if mod_name == '':
-            mod_name = gp_obj.name + main_layer.info + "TO"
-        mod = gp_obj.grease_pencil_modifiers.new(name=mod_name, type='GP_TIME')
+            mod_name = gp_obj.name + main_layer.name + "TO"
+        mod = gp_obj.modifiers.new(name=mod_name, type='GREASE_PENCIL_TIME')
         if pass_index > -1:
-            mod.layer_pass = pass_index
+            mod.layer_pass_filter = pass_index
         else:
-            mod.layer = main_layer.info
+            mod.layer_filter = main_layer.name
         mod.mode = 'FIX'
         if mode == 'EDIT':
             mod.show_viewport = False
@@ -1630,7 +1632,7 @@ def generate_morph_frames(self, context):
         bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
         self.gp_obj.select_set(True)
     context.view_layer.objects.active = self.gp_obj
-    bpy.ops.object.mode_set(mode='EDIT_GPENCIL', toggle=False)
+    bpy.ops.object.mode_set(mode='EDIT', toggle=False)
     gp = self.gp_obj.data
     original_autolock = gp.use_autolock_layers
     original_active_layer = gp.layers.active
@@ -1667,23 +1669,30 @@ def generate_morph_frames(self, context):
     def_frame_end = def_array_pos_to_def_frame_pos(self.def_frames_w-1,self.def_frames_h-1,self.def_frame_start,dw)
     gen_frame_end = gen_array_pos_to_gen_frame_pos(self.gen_frames_w-1,self.gen_frames_h-1,self.gen_frame_start,gw)
     #Setup our array of defined frames for easy access later
+    #TODO In GPv3, frame references seem to get dirty sometimes. We might not be able to cache these anymore. 
     for layer in self.layers:
         if layer:
+            print("Finding def frames in " + layer.name)
             def_frames_array = [[None for y in range(dh)] for x in range(dw)]
-            for frame in layer.frames:
+            num_frames = len(layer.frames)
+            for i in range(num_frames - 1, -1, -1):
+                frame = layer.frames[i]
                 n = frame.frame_number
-                if n > def_frame_end: #We're out of range.
-                    layer.frames.remove(frame)
-                elif n >= self.def_frame_start:
+                print("Frame " + str(n))
+                if n > def_frame_end: #We're out of range for defined frames. These frames are most likely old generated frames so we should clean them up
+                    layer.frames.remove(n)
+                elif n >= self.def_frame_start: #This is a defined frame. Cache its index
                     n -= self.def_frame_start
                     dy = math.floor(n/(dw+1))
                     dx = n-(dy*(dw+1))
                     if dx < dw and dy < dh:
-                        def_frames_array[dx][dy] = frame
+                        def_frames_array[dx][dy] = i    #In GPv3, changed from storing frame reference to storing frame index
             
             def_frames[layer] = def_frames_array
+    
     tmp_offset = math.ceil(gen_frame_end/1000+1)*1000     #The area where we'll temporarily put frames for manipulating before moving them to their final location
     def_used_x = 0
+    print("Src Frames " + str(def_frames))
     #Generate 'vertical' frame slices
     for dx in range(dw):
         if (dx*gpdx >= def_used_x):
@@ -1693,21 +1702,26 @@ def generate_morph_frames(self, context):
             for dy in range(dh):    #For each defined frame in this vertical slice, move to the offset location plus the generated y offset and interpolate the rest of the generated vertical
                 if (dy*gpdy >= def_used_y):
                     new_frame_num = tmp_offset + def_pos_offset_to_gen_pos_offset(dy,dh,gh)
-                    for layer,frames in def_frames.items():
-                        src_frame = frames[dx][dy]
-                        if src_frame is None:   #The defined frame is undefined D:
+                    for layer,frame_indexes in def_frames.items():
+                        src_frame = layer.frames[frame_indexes[dx][dy]]
+                        if not hasattr(src_frame, 'drawing'):
+                            print(f"Frame {src_frame} doesn't have the drawing attribute")
+                            return False
+                        if src_frame is None or not hasattr(src_frame, 'drawing') or src_frame.drawing is None:   #The defined frame is undefined D:
                             if (dx == 0 or dx == dw-1) and (dy == 0 or dy == dh-1):     #If the undefined frame is a corner, we got big problems. Otherwise, we good. Move along.
                                 if multiple_layers: reset_gp_layers_status(gp,multiple_layers,original_layers_status=original_layers_status,original_active_layer=original_active_layer,original_autolock=original_autolock)
                                 else:               reset_gp_layers_status(gp,multiple_layers,original_layer_locked=original_layer_locked,original_active_layer=original_active_layer,original_autolock=original_autolock)
-                                self.report({'ERROR'}, f"Corner Frame ({dx}, {dy}) of layer '{layer.info}' at frame {def_array_pos_to_def_frame_pos(dx,dy,self.def_frame_start,dw)} not defined.")
-                                return
+                                self.report({'ERROR'}, f"Corner Frame ({dx}, {dy}) of layer '{layer.name}' at frame {def_array_pos_to_def_frame_pos(dx,dy,self.def_frame_start,dw)} not defined.")
+                                return False
                             continue
                         else:   #Valid defined frame. Duplicate  and interpolate for this section of the vertical if needed.
-                            if len(src_frame.strokes) == 0 and frames_found and new_frame_num > last_frame_num+1 and self.interpolate: #Blank frame. 
+                            src_drawing = src_frame.drawing
+                            if src_drawing.attributes.domain_size('CURVE') == 0 and frames_found and new_frame_num > last_frame_num+1 and self.interpolate: #Blank frame. 
                                 for i in range(new_frame_num-1,last_frame_num,-1):  #We're going to have to duplicate the frame manually because interpolation won't work.
+                                    print("new " + str(i))
                                     layer.frames.new(i)
-                            layer.frames.copy(src_frame).frame_number = new_frame_num
-                        
+                            layer.frames.copy(src_frame.frame_number, new_frame_num, instance_drawing=False) #Create a drawing instance at the new frame. TODO: using instances causes it to crash
+                    
                     if frames_found and new_frame_num > last_frame_num+1 and self.interpolate:  #If there are frames before this one, and there is space, get to interpolating
                         context.scene.frame_current = new_frame_num-1
                         if dy == dh-1:  #Up direction
@@ -1725,17 +1739,22 @@ def generate_morph_frames(self, context):
                     def_used_y += 1
             
             gx = def_pos_offset_to_gen_pos_offset(dx,dw,gw)
+            # TODO GPv2 way of doing this. Remove if the new method works
+            # for layer in def_frames.keys():
+            #     for fi in range(len(layer.frames)-1,-1,-1): #For each new frame we just made by duplicating defined frames and interpolating, move to its final generated resting place
+            #         frame = layer.frames[fi]
+            #         if frame.frame_number < tmp_offset: #We're done looking for frames to move
+            #             break
+            #         gy = frame.frame_number-tmp_offset #Generated Y position
+            #         frame.keyframe_type = 'KEYFRAME'
+            #         layer.frames.move(frame.frame_number, gen_array_pos_to_gen_frame_pos(gx,gy,self.gen_frame_start,gw))
+            
             for layer in def_frames.keys():
-                for fi in range(len(layer.frames)-1,-1,-1): #For each new frame we just made by duplicating defined frames and interpolating, move to its final generated resting place
-                    frame = layer.frames[fi]
-                    if frame.frame_number < tmp_offset: #We're done looking for frames to move
-                        break
-                    gy = frame.frame_number-tmp_offset #Generated Y position
-                    frame.keyframe_type = 'KEYFRAME'
-                    frame.frame_number = gen_array_pos_to_gen_frame_pos(gx,gy,self.gen_frame_start,gw)
+                for gy in range(gh):
+                    layer.frames.move(tmp_offset + gy, gen_array_pos_to_gen_frame_pos(gx,gy,self.gen_frame_start,gw))
+
             def_used_x += 1
-    
-    refresh_GP_dopesheet(context)
+    # refresh_GP_dopesheet(context)
     #Generate 'horizontal' frame slices from 'vertical' slices made earlier
     if self.interpolate and gw > dw and gw > 1:
         gfpdx = gen_per_def(gw,dw)        #Generated Frames per Defined frames on the 'horizontal' (X) axis
@@ -1787,7 +1806,7 @@ def reset_gp_layers_status(gp,multiple_layers=True,original_layers_status=None,o
         gp.layers.active.lock = original_layer_locked
     gp.layers.active = original_active_layer
 
-def interpolate_sequence_view_independent(context=None, step=1, layers='ACTIVE', interpolate_selected_only=False, exclude_breakdowns=False, flip='AUTO', 
+def interpolate_sequence_view_independent(context=None, step=1, layers='ACTIVE',  exclude_breakdowns=False, flip='NONE', 
                                           smooth_steps=1, smooth_factor=0.0, type='LINEAR', easing='AUTO', back=1.702, amplitude=0.15, period=0.15, stroke_order_changes=False,stroke_order_change_offset_factor=0.5):
     #We need to override the context area sometimes because interpolate_sequence can only be run in the 3D viewport.
     if context is None:
@@ -1803,11 +1822,11 @@ def interpolate_sequence_view_independent(context=None, step=1, layers='ACTIVE',
         screen=context.window.screen
     ):
         if stroke_order_changes:
-            bpy.ops.gpencil.interpolate_sequence_disorderly(step=step,layers=layers,interpolate_selected_only=interpolate_selected_only,
+            bpy.ops.grease_pencil.interpolate_sequence_disorderly(step=step,layers=layers,
                                                 exclude_breakdowns=exclude_breakdowns,flip=flip,smooth_steps=smooth_steps,smooth_factor=smooth_factor,
                                                 type=type,easing=easing,back=back,amplitude=amplitude,period=period,stroke_order_change_offset_factor=stroke_order_change_offset_factor)
         else:
-            bpy.ops.gpencil.interpolate_sequence(step=step,layers=layers,interpolate_selected_only=interpolate_selected_only,
+            bpy.ops.grease_pencil.interpolate_sequence(step=step,layers=layers,
                                                 exclude_breakdowns=exclude_breakdowns,flip=flip,smooth_steps=smooth_steps,smooth_factor=smooth_factor,
                                                 type=type,easing=easing,back=back,amplitude=amplitude,period=period)
 #Regular lerp. In the future, might have more types, but for now it's just lerp.
@@ -1888,16 +1907,16 @@ def load_handler(dummy):
                 fcurve.driver.expression = fcurve.driver.expression #Would be nice if we didn't have to do this
     
 def register():
+    register_driver_funcs()
     for cls in _classes:
         bpy.utils.register_class(cls)
-    bpy.types.VIEW3D_MT_edit_gpencil.append(gpencil_menu_additions)
-    bpy.types.VIEW3D_MT_draw_gpencil.append(gpencil_menu_additions)
+    bpy.types.VIEW3D_MT_edit_greasepencil.append(gpencil_menu_additions)
+    bpy.types.VIEW3D_MT_paint_grease_pencil.append(gpencil_menu_additions)
     bpy.app.handlers.load_post.append(load_handler)
-    register_driver_funcs()
 
 def unregister():
-    bpy.types.VIEW3D_MT_edit_gpencil.remove(gpencil_menu_additions)
-    bpy.types.VIEW3D_MT_draw_gpencil.remove(gpencil_menu_additions)
+    bpy.types.VIEW3D_MT_edit_greasepencil.remove(gpencil_menu_additions)
+    bpy.types.VIEW3D_MT_paint_grease_pencil.remove(gpencil_menu_additions)
     bpy.app.handlers.load_post.remove(load_handler)
     for cls in _classes:
         bpy.utils.unregister_class(cls)

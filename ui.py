@@ -26,7 +26,7 @@ class GP2DMORPHSPanel:
     @classmethod
     def poll(cls, context):
         ob = context.object
-        return ob and (ob.type == 'GPENCIL' or ob.type == 'ARMATURE')
+        return ob and (ob.type == 'GREASEPENCIL' or ob.type == 'ARMATURE')
 
 class GP2DMORPHS_PT_Options(GP2DMORPHSPanel, bpy.types.Panel):
     """Creates a Panel in the Object properties window"""
@@ -101,7 +101,7 @@ class GP2DMORPHS_PT_OptionsDefinedFrames(GP2DMORPHS_PT_OptionsSub):
                 f = GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frame_start + y*(GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_w+1) + x   #The frame that this button and position in the defined 'array' represents and links to
                 props = row.operator("GP2DMORPHS.set_frame_by_defined_pos", text = str(f), depress = f==context.scene.frame_current)
                 props.pos_x, props.pos_y, props.def_frame_start, props.def_frames_w = x, y, GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frame_start, GP2DMORPHS_PT_OptionsSub.GP2DMORPHSVars.def_frames_w
-        if GP2DMORPHS_PT_OptionsSub.obj.type == 'GPENCIL':
+        if GP2DMORPHS_PT_OptionsSub.obj.type == 'GREASEPENCIL':
             if GP2DMORPHS_PT_OptionsSub.active_node:
                 n = GP2DMORPHS_PT_OptionsSub.active_node
                 op_props = layout.operator("GP2DMORPHS.fill_defined_frames")
@@ -210,7 +210,7 @@ class GP2DMORPHS_PT_OptionsGeneratedFrames(GP2DMORPHS_PT_OptionsSub):
             return GP2DMORPHS_PT_OptionsSub.active_node.bl_idname == "GP2DMorphsNodeGP2DMorph" and GP2DMORPHS_PT_OptionsSub.active_node.obj
         else:
             ob = context.object
-            return ob and ob.type == 'GPENCIL'
+            return ob and ob.type == 'GREASEPENCIL'
 
 class GP2DMORPHS_PT_OptionsGeneratedBoneDrivers(GP2DMORPHS_PT_OptionsSub):
     bl_label = "Bone Transform Morphs"

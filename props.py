@@ -15,12 +15,12 @@ class GP2DMORPHS_OpProps(bpy.types.PropertyGroup):
     #Interpolation
     interpolate: BoolProperty(name="interpolate", default = True, description="Interpolate between defined frames. Without this, the addon will not generate any new frames and just reorganize the defined frames into the positions they would be in when generated.")
     
-    interp_type_enum = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['type'].enum_items if ot.identifier != 'CUSTOM']
+    interp_type_enum = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.grease_pencil.interpolate_sequence.get_rna_type().properties['type'].enum_items if ot.identifier != 'CUSTOM']
     interp_type_left : EnumProperty(name="Interpolation Type", items = interp_type_enum, description="Interpolation Type in the left direction")
     interp_type_right : EnumProperty(name="Interpolation Type", items = interp_type_enum, description="Interpolation Type in the right direction")
     interp_type_up : EnumProperty(name="Interpolation Type", items = interp_type_enum, description="Interpolation Type in the up direction")
     interp_type_down : EnumProperty(name="Interpolation Type", items = interp_type_enum, description="Interpolation Type in the down direction")
-    interp_easing_enum = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.gpencil.interpolate_sequence.get_rna_type().properties['easing'].enum_items if ot.identifier != 'AUTO']
+    interp_easing_enum = [(ot.identifier, ot.name, ot.description, ot.icon, ot.value) for ot in bpy.ops.grease_pencil.interpolate_sequence.get_rna_type().properties['easing'].enum_items if ot.identifier != 'AUTO']
     interp_easing_left : EnumProperty(name="Interpolation Easing", default='EASE_OUT', items = interp_easing_enum, description="Interpolation Easing in the left direction")
     interp_easing_right : EnumProperty(name="Interpolation Easing", default='EASE_OUT', items = interp_easing_enum, description="Interpolation Easing in the right direction")
     interp_easing_up : EnumProperty(name="Interpolation Easing", default='EASE_OUT', items = interp_easing_enum, description="Interpolation Easing in the up direction")

@@ -11,7 +11,7 @@ class GP2DMorphsNodeMorphBase(GP2DMorphsNodeBase):
 
     props: PointerProperty(type=GP2DMORPHS_OpProps)
     lock_morph : BoolProperty(name="Lock Morph",default=False,description="Lock Morph so that its frames won't get updated when other nodes get updated")
-    obj : PointerProperty(name="GPencil", type=bpy.types.Object, poll=lambda self, o: o.type == 'GPENCIL', description="The Grease Pencil Object that contains the layer(s) to be morphed")
+    obj : PointerProperty(name="GPencil", type=bpy.types.Object, poll=lambda self, o: o.type == 'GREASEPENCIL', description="The Grease Pencil Object that contains the layer(s) to be morphed")
     list_index : IntProperty()
     name_list : CollectionProperty(type=GP2DMORPHSUIListItemString)
 

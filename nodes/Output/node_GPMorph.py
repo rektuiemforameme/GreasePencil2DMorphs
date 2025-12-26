@@ -9,7 +9,7 @@ class GP2DMorphsNodeGP2DMorph(GP2DMorphsNodeMorphBase):
     bl_label = 'GPencil Morph'
     bl_icon = 'GP_MULTIFRAME_EDITING'
 
-    obj : PointerProperty(name="GPencil", type=bpy.types.Object, poll=lambda self, o: o.type == 'GPENCIL', description="The Grease Pencil Object that contains the layer(s) to be morphed")
+    obj : PointerProperty(name="GPencil", type=bpy.types.Object, poll=lambda self, o: o.type == 'GREASEPENCIL', description="The Grease Pencil Object that contains the layer(s) to be morphed")
     lock_morph : BoolProperty(name="Lock Morph",default=False,description="Lock Morph so that its frames won't get updated when other nodes get updated")
 
     def init(self, context):
@@ -27,7 +27,7 @@ class GP2DMorphsNodeGP2DMorph(GP2DMorphsNodeMorphBase):
         
         if self.obj is None:
             for o in bpy.data.objects:
-                if o and o.type == 'GPENCIL':
+                if o and o.type == 'GREASEPENCIL':
                     self.obj = o
                     break
         self.add_to_name_list()
@@ -150,17 +150,17 @@ class GP2DMorphsNodeGP2DMorph(GP2DMorphsNodeMorphBase):
                 layer = self.obj.data.layers.get(self.get_first_nonblank_name())
                 if layer is None:   return
                 pindex = layer.pass_index
-                for m in self.obj.grease_pencil_modifiers:
-                    if m.type == 'GP_TIME':
-                        if pindex == m.layer_pass:
+                for m in self.obj.modifiers:
+                    if m.type == 'GREASE_PENCIL_TIME':
+                        if pindex == m.layer_pass_filter:
                             m.show_viewport = mode == 'ANIMATE'
                             return
             else:                       #Use the layer(s) to toggle the modifier(s)
                 mod_view = mode == 'ANIMATE'
                 name_list_names = [item.name for item in self.name_list]
-                for m in self.obj.grease_pencil_modifiers:
-                    if m.type == 'GP_TIME':
-                        if m.layer in name_list_names:
+                for m in self.obj.modifiers:
+                    if m.type == 'GREASE_PENCIL_TIME':
+                        if m.layer_filter in name_list_names:
                             m.show_viewport = mod_view
     
     def get_pass_index(self):
@@ -177,14 +177,14 @@ class GP2DMorphsNodeGP2DMorph(GP2DMorphsNodeMorphBase):
         if self.obj is None or layer is None: return None
         if self.props.use_layer_pass:    #Use the pass index to find the modifier
             pindex = layer.pass_index
-            for m in self.obj.grease_pencil_modifiers:
-                if m.type == 'GP_TIME':
-                    if pindex == m.layer_pass:
+            for m in self.obj.modifiers:
+                if m.type == 'GREASE_PENCIL_TIME':
+                    if pindex == m.layer_pass_filter:
                         return m
         else:                       #Use the layer to find the modifier
-            for m in self.obj.grease_pencil_modifiers:
-                if m.type == 'GP_TIME':
-                    if m.layer == layer_name:
+            for m in self.obj.modifiers:
+                if m.type == 'GREASE_PENCIL_TIME':
+                    if m.layer_filter == layer_name:
                         return m
         return None
     
@@ -209,19 +209,19 @@ class GP2DMorphsNodeGP2DMorph(GP2DMorphsNodeMorphBase):
                             last_layer_index = gp.layers.find(n.name)
                             if last_layer_index == -1: continue
                             for li in range(last_layer_index+1,len(gp.layers)): #Try going forwards
-                                if gp.layers[li].info not in other_layers:
-                                    self.name_list[len(self.name_list)-1].name = gp.layers[li].info
+                                if gp.layers[li].name not in other_layers:
+                                    self.name_list[len(self.name_list)-1].name = gp.layers[li].name
                                     return
                             for li in range(last_layer_index-1,-1,-1):          #Backwards
-                                if gp.layers[li].info not in other_layers:
-                                    self.name_list[len(self.name_list)-1].name = gp.layers[li].info
+                                if gp.layers[li].name not in other_layers:
+                                    self.name_list[len(self.name_list)-1].name = gp.layers[li].name
                                     return
                         except ValueError:
                             continue
             
             for l in gp.layers:
-                if l.info not in other_layers:
-                    self.name_list[len(self.name_list)-1].name = l.info
+                if l.name not in other_layers:
+                    self.name_list[len(self.name_list)-1].name = l.name
                     return
                 
     def flip_names(self):

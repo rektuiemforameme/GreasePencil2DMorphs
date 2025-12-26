@@ -4,7 +4,7 @@ def refresh_GP_dopesheet(context=None) :
     if context is None:
         context = bpy.context
     #dirty way to force blender to refresh frames indices in grease pencil dopesheet
-    if context.object.type == 'GPENCIL' :
+    if context.object.type == 'GREASEPENCIL' :
         cur_areatype = str(context.area.type)
         context.area.type = 'DOPESHEET_EDITOR'
         cur_space_mode = str(context.area.spaces[0].mode)
